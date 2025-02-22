@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@vue/cli-service": "^3.3.1",
+    "axios": "^1.7.7",
+    "cacache": "^19.0.1",
+    "chart.js": "^4.4.6",
+    "vue-chartjs": "^5.3.1"
+  },
+  "devDependencies": {
+    "@vue/compiler-sfc": "^3.5.12"
+  }
+}
