@@ -1,337 +1,542 @@
 <template>
-  <div class="app">
-    <h1>Страница с постами</h1>
-    <div class="app__btns">
-      <MyButton @click="showDialog">Создать пост</MyButton>
-      <MySelect v-model="selectedSort" :options="sortOptions" />
-    </div>
-
-    <MyDialog v-model:show="dialogVisible">
-      <PostForm @create="createPost" />
-    </MyDialog>
-
-    <PostList :posts="posts" @remove="removePost" v-if="!isPostsLoading" />
-    <div v-else>Идет загрузка...</div>
-
-    <div>
-      <h2>График посещений</h2>
-      <ChartComponent
-        :chartData="filteredChartData"
-        :chartOptions="chartOptions"
-        @subject-click="handleSubjectClick"
-      />
-    </div>
-
-    <MyDialog v-model:show="groupDialogVisible">
-      <h3>Выберите учебную группу для предмета: {{ selectedSubject }}</h3>
-      <MySelect v-model="selectedGroup" :options="groupOptions" />
-      <MyButton @click="showStudents">Показать студентов</MyButton>
-    </MyDialog>
-
-    <div>
-      <h3>Студенты группы {{ selectedGroup }} по предмету: {{ selectedSubject }}</h3>
-      <ul>
-        <li v-for="(student, index) in selectedStudents" :key="index">
-          <span class="clickable" @click="showOptions(student)">
-            {{ student.name }}
-          </span> 
-          - Средний балл: {{ calculateAverage(student.grade) }}
-        </li>
-      </ul>
-    </div>
-
-    <MyDialog v-model:show="studentDialogVisible">
-  <h3>{{ dialogTitle }}</h3>
   <div>
-    <label for="action-select">Выберите действие:</label>
-    <select id="action-select" v-model="selectedAction" @change="handleActionChange">
-      <option value="" disabled>Выберите...</option>
-      <option value="grades">Оценки</option>
-      <option value="attendance">Количество посещенных занятий</option>
-      <option value="debts">Количество долгов</option>
+    <!-- Header в стиле ИРНИТУ -->
+    <header class="q-header fixed-top bg-white text-black">
+      <div class="toolbar row no-wrap items-center">
+        <div class="toolbar-left">
+          <a class="btn-logo" href="#">
+            <div class="avatar">
+              <img src="@/assets/istu_logo.png" alt="ИРНИТУ">
+            </div>
+            <h5 class="m-2">Инструменты для обработки открытых данных студентов</h5>
+          </a>
+          <a class="nav-tab" 
+             :class="{ active: activeTab === 'statistics' }"
+             @click="activeTab = 'statistics'"
+             href="#">
+            <i class="material-icons">analytics</i>
+            Статистика оценок
+          </a>
+          <a class="nav-tab"
+             :class="{ active: activeTab === 'academic' }"
+             @click="activeTab = 'academic'"
+             href="#">
+            <i class="material-icons">school</i>
+            Академический отпуск
+          </a>
+    </div>
+
+
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mt-5 pt-3">
+      <!-- Статистика оценок -->
+      <div v-if="activeTab === 'statistics'" class="statistics-section">
+        <div class="row mb-4">
+          <div class="col">
+            <div class="card">
+              <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                  <h5 class="mb-0">Статистика успеваемости</h5>
+                  <div class="d-flex gap-2">
+                    <select class="form-select form-select-sm" v-model="selectedSemester">
+                      <option v-for="sem in semesterOptions" :key="sem.value" :value="sem.value">
+                        {{ sem.name }}
+                      </option>
+                    </select>
+                    <select class="form-select form-select-sm" v-model="selectedSubject">
+                      <option v-for="subj in subjectOptions" :key="subj.value" :value="subj.value">
+                        {{ subj.name }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="card h-100">
+                      <div class="card-body">
+                        <h6 class="card-title">Статистика баллов</h6>
+                        <ChartComponent :chartData="averageGradeData" :chartOptions="chartOptions"/>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="card h-100">
+                      <div class="card-body">
+                        <h6 class="card-title">Распределение оценок</h6>
+                        <ChartComponent :chartData="gradeDistributionData" :chartOptions="chartOptions"/>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+
+      <!-- Академический отпуск -->
+      <div v-if="activeTab === 'academic'" class="academic-leave-section">
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="mb-0">Статистика по статусам студентов</h5>
+          </div>
+          <div class="card-body">
+            <ChartComponent :chartData="academicStatusChartData" :chartOptions="chartOptions"/>
+          </div>
+    </div>
+
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Студенты после академического отпуска</h5>
+            <div class="d-flex gap-2">
+              <select class="form-select form-select-sm" v-model="selectedStatus">
+                <option value="">Все статусы</option>
+                <option v-for="status in uniqueStatuses" :key="status" :value="status">
+                  {{ status }}
+                </option>
     </select>
   </div>
-
-  <div v-if="dialogType === 'grades'">
-    <table>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
       <thead>
         <tr>
-          <th>Оценка</th>
+                    <th>ФИО</th>
+                    <th>Группа</th>
+                    <th>Дата возвращения</th>
+                    <th>Статус</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(grade, index) in selectedStudent?.grade || []" :key="index">
-          <td>{{ grade }}</td>
+                  <tr v-for="student in filteredStudents" :key="student.id">
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.group }}</td>
+                    <td>{{ formatDate(student.returnDate) }}</td>
+                    <td>
+                      <span :class="getStatusBadgeClass(student.status)">
+                        {{ student.status }}
+                      </span>
+                    </td>
         </tr>
       </tbody>
     </table>
-    <p>Средний балл: {{ calculateAverage(selectedStudent?.grade || []) }}</p>
-    <ChartComponent
-      v-if="gradesChartData"
-      :chartData="gradesChartData"
-      :chartOptions="gradesChartOptions"
-    />
+            </div>
+          </div>
   </div>
-
-  <div v-else-if="dialogType === 'attendance'">
-    <p>Количество посещенных занятий: {{ getAttendance(selectedStudent?.name) }}</p>
   </div>
-
-  <div v-else-if="dialogType === 'debts'">
-    <p>Количество долгов: {{ calculateDebts(selectedStudent?.grade || []) }}</p>
   </div>
-</MyDialog>
-
   </div>
 </template>
 
-
-
-
 <script>
-import PostForm from "@/comp/PostForm.vue";
-import PostList from "@/comp/PostList.vue";
-import MyButton from "./comp/UI/MyButton.vue";
-import MySelect from "./comp/UI/MySelect.vue";
-import MyDialog from "./comp/UI/MyDialog.vue";
-import ChartComponent from "./comp/ChartComponent.vue";
+import 'bootstrap/dist/css/bootstrap.min.css'
+import 'bootstrap'
+import ChartComponent from "./comp/ChartComponent.vue"
+import Papa from 'papaparse'
 
 export default {
+  name: 'App',
   components: {
-    PostList,
-    PostForm,
-    MyButton,
-    MySelect,
-    MyDialog,
-    ChartComponent,
+    ChartComponent
   },
-
   data() {
     return {
-      posts: [],
-      dialogVisible: false,
-      isPostsLoading: false,
-      selectedSort: "",
-      sortOptions: [
-        { name: "По названию", value: "title" },
-        { name: "По содержанию", value: "body" },
+      activeTab: 'statistics',
+      selectedSemester: '1',
+      selectedSubject: '',
+      marksData: [],
+      returnedStudentsData: [],
+      semesterOptions: [
+        { value: '1', name: '1 семестр' },
+        { value: '2', name: '2 семестр' },
+        { value: '3', name: '3 семестр' },
+        { value: '4', name: '4 семестр' }
       ],
-      chartData: {
-        type: "bar",
-        data: {
-          labels: ["Математика", "Физика", "Программирование", "История", "Английский"],
-          datasets: [
-            {
-              label: "Количество посещенных занятий",
-              data: [10, 8, 9, 7, 5],
-              backgroundColor: "rgba(75, 192, 192, 0.6)",
-              borderColor: "rgba(75, 192, 192, 1)",
-              borderWidth: 1,
-            },
-          ],
-        },
-      },
+      subjectOptions: [],
       chartOptions: {
         responsive: true,
+        maintainAspectRatio: false,
+        events: [],
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            enabled: false
+          }
+        },
         scales: {
           y: {
             beginAtZero: true,
-          },
+            ticks: {
+              stepSize: 1,
+              precision: 0
+            }
+          }
         },
+        animation: false
       },
-      studentsData: {
-        Математика: {
-          "ЭВМб-22-1": [
-            { name: "Дагонов Иван", grade: [5, 4, 3, 3] },
-            { name: "Иванова Мария", grade: [5, 4, 2, 5] },
-            { name: "Никитин Николай", grade: [4, 4, 2, 3] },
-            { name: "Моспанюк Ольга", grade: [4, 4, 2, 5] },
-            { name: "Угарин Геральд", grade: [4, 5, 3, 3] },
-            { name: "Петров Никита", grade: [3, 3, 3, 2] },
-          ],
-        },
-      },
-      selectedSubject: null,
-      selectedGroup: null,
-      groupOptions: [],
-      selectedStudents: [],
-      groupDialogVisible: false,
-      studentDialogVisible: false,
-      dialogTitle: "",
-      dialogType: "",
-      selectedStudent: null,
-      attendanceData: {
-        "Дагонов Иван": 10,
-        "Иванова Мария": 8,
-        "Никитин Николай": 9,
-        "Моспанюк Ольга": 7,
-        "Угарин Геральд": 5,
-        "Петров Никита": 3,
-      },
-      attendanceWeeklyData: {
-        "Дагонов Иван": [3, 2, 4, 1],
-        "Иванова Мария": [2, 3, 3, 0],
-        "Никитин Николай": [4, 1, 2, 2],
-        "Моспанюк Ольга": [2, 2, 3, 0],
-        "Угарин Геральд": [1, 1, 2, 1],
-        "Петров Никита": [0, 2, 1, 0],
-      },
-      selectedAction: "",
-      gradesChartData: null,
-      gradesChartOptions: {
-        responsive: true,
-        scales: {
-          y: {
-            beginAtZero: true,
-          },
-        },
-      },
-    };
+      selectedStatus: '',
+      statusColors: {
+        'Отчислен': 'bg-danger',
+        'Продолжает обучение': 'bg-primary',
+        'Возвращён': 'bg-success'
+      }
+    }
   },
-
   computed: {
-    filteredChartData() {
-      return this.chartData;
+    academicLeaveStudents() {
+      if (!this.returnedStudentsData.length) return []
+      
+      return this.returnedStudentsData.map(student => ({
+        id: student.id,
+        name: student['ФИО'],
+        group: student['Группа'],
+        returnDate: student['Дата возвращения'],
+        status: student['Статус']
+      }))
     },
-  },
+    
+    filteredMarks() {
+      if (!this.marksData.length || !this.selectedSemester || !this.selectedSubject) return []
+      
+      return this.marksData.filter(mark => 
+        mark['Семестр']?.toString() === this.selectedSemester.toString() &&
+        mark['Предмет'] === this.selectedSubject
+      )
+    },
+    
+    averageGradeData() {
+      const marks = this.filteredMarks.map(m => Number(m['Оценка'] || 0))
+      const min = marks.length ? Math.min(...marks) : 0
+      const avg = marks.length ? marks.reduce((a, b) => a + b, 0) / marks.length : 0
+      const max = marks.length ? Math.max(...marks) : 0
 
-  methods: {
-    calculateAverage(grades) {
-      if (!Array.isArray(grades) || grades.length === 0) {
-        return 0;
-      }
-      const total = grades.reduce((sum, grade) => sum + grade, 0);
-      return (total / grades.length).toFixed(2);
-    },
-    calculateDebts(grades) {
-      return grades.filter((grade) => grade < 3).length;
-    },
-    getAttendance(name) {
-      return this.attendanceData[name] || 0;
-    },
-    createPost(post) {
-      this.posts.push(post);
-      this.dialogVisible = false;
-    },
-    removePost(post) {
-      this.posts = this.posts.filter((p) => p.id !== post.id);
-    },
-    showDialog() {
-      this.dialogVisible = true;
-    },
-    handleSubjectClick({ subject }) {
-      this.selectedSubject = subject;
-
-      const groups = this.studentsData[subject] || {};
-      this.groupOptions = Object.keys(groups).map((group) => ({
-        name: group,
-        value: group,
-      }));
-      this.groupDialogVisible = true;
-    },
-    showStudents() {
-      if (this.selectedGroup && this.selectedSubject) {
-        this.selectedStudents =
-          this.studentsData[this.selectedSubject][this.selectedGroup] || [];
-
-        if (this.selectedStudents.length > 0) {
-          this.groupDialogVisible = false;
-        } else {
-          alert("Нет студентов для выбранной группы и предмета.");
-        }
-      } else {
-        alert("Пожалуйста, выберите группу и предмет.");
-      }
-    },
-    showOptions(student) {
-      this.selectedStudent = student;
-      this.dialogTitle = `Статистика студента: ${student.name}`;
-      this.selectedAction = ""; // Сброс действия
-      this.studentDialogVisible = true;
-    },
-    handleActionChange() {
-      if (this.selectedAction === "grades") {
-        this.dialogType = "grades";
-        this.dialogTitle = `Оценки студента: ${this.selectedStudent.name}`;
-        this.updateGradesChart(this.selectedStudent.grade);
-      } else if (this.selectedAction === "attendance") {
-        this.dialogType = "attendance";
-        this.dialogTitle = `Посещения студента: ${this.selectedStudent.name}`;
-      } else if (this.selectedAction === "debts") {
-        this.dialogType = "debts";
-        this.dialogTitle = `Долги студента: ${this.selectedStudent.name}`;
-      } else {
-        this.dialogType = "";
-        this.dialogTitle = "";
-      }
-    },
-    updateGradesChart(grades) {
-      if (!Array.isArray(grades) || grades.length === 0) {
-        this.gradesChartData = null;
-        return;
-      }
-      this.gradesChartData = {
-        type: "bar",
+      return {
+        type: 'bar',
         data: {
-          labels: grades.map((_, index) => `Оценка ${index + 1}`),
-          datasets: [
-            {
-              label: "Оценки",
-              data: grades,
-              backgroundColor: "rgba(153, 102, 255, 0.6)",
-              borderColor: "rgba(153, 102, 255, 1)",
-              borderWidth: 1,
-            },
-          ],
-        },
-      };
+          labels: ['Минимальный балл', 'Средний балл', 'Максимальный балл'],
+          datasets: [{
+            label: 'Баллы',
+            data: [min, Number(avg.toFixed(2)), max],
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.6)', // красный для минимального
+              'rgba(255, 205, 86, 0.6)', // желтый для среднего
+              'rgba(75, 192, 192, 0.6)'  // зеленый для максимального
+            ],
+            borderColor: [
+              'rgb(255, 99, 132)',
+              'rgb(255, 205, 86)',
+              'rgb(75, 192, 192)'
+            ],
+            borderWidth: 1,
+            barPercentage: 0.5
+          }]
+        }
+      }
     },
+    
+    gradeDistributionData() {
+      const distribution = {
+        'Отлично (5)': 0,
+        'Хорошо (4)': 0,
+        'Удовлетворительно (3)': 0,
+        'Неудовлетворительно (2)': 0
+      }
+
+      this.filteredMarks.forEach(mark => {
+        const grade = Number(mark['Оценка'] || 0)
+        if (grade === 5) distribution['Отлично (5)']++
+        else if (grade === 4) distribution['Хорошо (4)']++
+        else if (grade === 3) distribution['Удовлетворительно (3)']++
+        else distribution['Неудовлетворительно (2)']++
+      })
+
+      return {
+        type: 'pie',
+        data: {
+          labels: Object.keys(distribution),
+          datasets: [{
+            data: Object.values(distribution),
+            backgroundColor: [
+              'rgba(75, 192, 192, 0.6)',  // зеленый для отлично
+              'rgba(54, 162, 235, 0.6)',  // синий для хорошо
+              'rgba(255, 205, 86, 0.6)',  // желтый для удовл
+              'rgba(255, 99, 132, 0.6)'   // красный для неуд
+            ],
+            borderColor: [
+              'rgb(75, 192, 192)',
+              'rgb(54, 162, 235)',
+              'rgb(255, 205, 86)',
+              'rgb(255, 99, 132)'
+            ],
+            borderWidth: 1
+          }]
+        }
+      }
+    },
+
+    filteredStudents() {
+      if (!this.selectedStatus) return this.academicLeaveStudents
+      
+      return this.academicLeaveStudents.filter(student => 
+        student.status === this.selectedStatus
+      )
+    },
+
+    uniqueStatuses() {
+      return [...new Set(this.academicLeaveStudents.map(student => student.status))]
+    },
+
+    academicStatusChartData() {
+      const statusCount = this.academicLeaveStudents.reduce((acc, student) => {
+        acc[student.status] = (acc[student.status] || 0) + 1
+        return acc
+      }, {})
+
+      const colors = {
+        'Отчислен': 'rgba(255, 99, 132, 0.6)', 
+        'Продолжает обучение': 'rgba(54, 162, 235, 0.6)',
+        'Возвращён': 'rgba(75, 192, 192, 0.6)'
+      }
+
+      const borderColors = {
+        'Отчислен': 'rgb(255, 99, 132)',
+        'Продолжает обучение': 'rgb(54, 162, 235)',
+        'Возвращён': 'rgb(75, 192, 192)'
+      }
+
+      return {
+        type: 'pie',
+        data: {
+          labels: Object.keys(statusCount),
+          datasets: [{
+            data: Object.values(statusCount),
+            backgroundColor: Object.keys(statusCount).map(status => colors[status]),
+            borderColor: Object.keys(statusCount).map(status => borderColors[status]),
+            borderWidth: 1
+          }]
+        }
+      }
+    }
   },
-};
+  methods: {
+    async loadCSVData() {
+      try {
+        const marksResponse = await fetch('/datasets/marks_dataset.csv')
+        if (!marksResponse.ok) {
+          throw new Error(`HTTP error! status: ${marksResponse.status}`);
+        }
+        const marksText = await marksResponse.text()
+        console.log('Загруженные данные оценок:', marksText)
+
+        const marksResult = Papa.parse(marksText, {
+          header: true,
+          delimiter: ';',
+          skipEmptyLines: true,
+          transform: (value) => value.trim()
+        })
+
+        if (marksResult.errors.length) {
+          console.error('Ошибки парсинга оценок:', marksResult.errors)
+        }
+
+        this.marksData = marksResult.data.filter(mark => 
+          mark['Предмет'] && 
+          mark['Семестр'] && 
+          mark['Оценка']
+        )
+        console.log('Обработанные данные оценок:', this.marksData)
+
+        const uniqueSubjects = [...new Set(this.marksData.map(mark => mark['Предмет']))]
+        this.subjectOptions = uniqueSubjects
+          .filter(Boolean)
+          .map(subject => ({
+            value: subject,
+            name: subject
+          }))
+
+        if (this.subjectOptions.length) {
+          this.selectedSubject = this.subjectOptions[0].value
+        }
+
+        const studentsResponse = await fetch('/datasets/returned_students.csv')
+        if (!studentsResponse.ok) {
+          throw new Error(`HTTP error! status: ${studentsResponse.status}`);
+        }
+        const studentsText = await studentsResponse.text()
+        console.log('Загруженные данные студентов:', studentsText) // для отладки
+
+        const studentsResult = Papa.parse(studentsText, {
+          header: true,
+          delimiter: ';',
+          skipEmptyLines: true,
+          transform: (value) => value.trim()
+        })
+
+        if (studentsResult.errors.length) {
+          console.error('Ошибки парсинга данных студентов:', studentsResult.errors)
+        }
+
+        this.returnedStudentsData = studentsResult.data.filter(student => 
+          student['ФИО'] && 
+          student['Группа'] && 
+          student['Дата возвращения'] &&
+          student['Статус']
+        )
+        console.log('Обработанные данные студентов:', this.returnedStudentsData) // для отладки
+
+      } catch (error) {
+        console.error('Ошибка при загрузке данных:', error)
+      }
+    },
+
+    formatDate(dateStr) {
+      const date = new Date(dateStr)
+      return date.toLocaleDateString('ru-RU')
+    },
+
+    getStatusBadgeClass(status) {
+      return `badge ${this.statusColors[status] || 'bg-secondary'}`
+    }
+  },
+  mounted() {
+    this.loadCSVData()
+  }
+}
 </script>
 
-
-
 <style>
-* {
-  margin: 5px;
-  padding: 5px;
-  box-sizing: border-box;
-}
-.app {
-  padding: 10px;
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
+/* Header styles */
+.q-header {
+  height: 50px;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.app__btns {
-  margin: 15px 0;
+.toolbar {
+  height: 50px;
+  padding: 0 16px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
 }
 
-.clickable {
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-logo {
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.avatar {
+  width: 35px;
+  height: 35px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.nav-tab:hover {
+  color: #1976d2;
+}
+
+.nav-tab.active {
+  color: #1976d2;
+  position: relative;
+}
+
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #1976d2;
+}
+
+.nav-tab i {
+  margin-right: 8px;
+  font-size: 20px;
+}
+
+.btn-user {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  color: #333;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: color 0.3s, background-color 0.3s;
+  white-space: nowrap;
 }
 
-.clickable:hover {
-  color: #007bff;
-  background-color: #f0f8ff; 
+.btn-user i {
+  margin-right: 8px;
+  font-size: 20px;
 }
 
-
-.dialog-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+/* Adjust main content padding */
+.container {
+  padding-top: 60px;
 }
 
-.grades-table {
-  width: 50%;
+/* Keep existing styles */
+.nav-link {
+  cursor: pointer;
 }
 
-.grades-chart {
-  width: 50%;
+.card {
+  margin-bottom: 1rem;
+}
+
+.chart-container {
+  height: 300px;
+}
+
+.badge {
+  font-size: 0.875rem;
+  padding: 0.5em 0.75em;
+}
+
+.table th {
+  font-weight: 500;
+  background-color: #f8f9fa;
+}
+
+.chart-container {
+  min-height: 300px;
 }
 </style>
-
-

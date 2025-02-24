@@ -1,77 +1,86 @@
 <template>
-  <div>
-    <canvas ref="chartCanvas"></canvas>
+  <div class="chart-container">
+    <canvas ref="chart"></canvas>
   </div>
 </template>
 
 <script>
-import { Chart } from "chart.js/auto";
+import { Chart } from 'chart.js/auto'
 
 export default {
+  name: 'ChartComponent',
   props: {
     chartData: {
       type: Object,
-      required: true,
+      required: true
     },
     chartOptions: {
       type: Object,
-      default: () => ({}),
-    },
+      default: () => ({})
+    }
   },
   data() {
     return {
       chart: null,
-    };
-  },
-  mounted() {
-    this.renderChart();
-  },
-  methods: {
-    renderChart() {
-      if (this.chart) {
-        this.chart.destroy();
+      defaultOptions: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          }
+        }
       }
-      this.chart = new Chart(this.$refs.chartCanvas, {
-        type: this.chartData.type || "bar",
-        data: this.chartData.data,
-        options: {
-          ...this.chartOptions,
-          onClick: this.handleChartClick, 
-        },
-      });
-    },
-    handleChartClick(event) {
-      const elements = this.chart.getElementsAtEventForMode(
-        event,
-        'nearest', 
-        { intersect: true },
-        false
-      );
-      if (elements.length) {
-        const datasetIndex = elements[0].datasetIndex; 
-        const dataIndex = elements[0].index;
-
-        // Извлекаем данные
-        const subject = this.chart.data.labels[dataIndex];
-        this.$emit("subject-click", { subject, dataIndex, datasetIndex });
-      }
-    },
+    }
   },
   watch: {
     chartData: {
-      deep: true,
       handler() {
-        this.renderChart();
+        this.$nextTick(() => {
+          if (this.chart) {
+            this.chart.destroy()
+          }
+          this.createChart()
+        })
       },
-    },
+      deep: true
+    }
   },
-};
+  methods: {
+    createChart() {
+      if (!this.$refs.chart) return
+
+      const ctx = this.$refs.chart.getContext('2d')
+      
+      const config = {
+        type: this.chartData.type || 'bar',
+        data: this.chartData.data || { datasets: [] },
+        options: {
+          ...this.defaultOptions,
+          ...this.chartOptions
+        }
+      }
+
+      this.chart = new Chart(ctx, config)
+    }
+  },
+  mounted() {
+    this.createChart()
+  },
+  beforeUnmount() {
+    if (this.chart) {
+      this.chart.destroy()
+      this.chart = null
+    }
+  }
+}
 </script>
 
-
 <style scoped>
-canvas {
-  max-width: 100%;
-  height: auto;
+.chart-container {
+  position: relative;
+  height: 300px;
+  width: 100%;
 }
 </style>
