@@ -73,6 +73,85 @@
                     </div>
                   </div>
                 </div>
+                <!-- Добавляем таблицу статистики -->
+                <div class="row mt-4">
+                  <div class="col">
+                    <div class="table-responsive">
+                      <table class="table table-bordered table-hover">
+                        <thead class="table-light">
+                          <tr>
+                            <th>Показатель</th>
+                            <th>Значение</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>Всего студентов</td>
+                            <td>{{ filteredMarks.length }}</td>
+                          </tr>
+                          <tr>
+                            <td>Средний балл</td>
+                            <td>{{ calculateAverage(filteredMarks) }}</td>
+                          </tr>
+                          <tr>
+                            <td>Отличников (5)</td>
+                            <td>{{ countGrades(filteredMarks, 5) }} ({{ calculatePercentage(filteredMarks, 5) }}%)</td>
+                          </tr>
+                          <tr>
+                            <td>Хорошистов (4)</td>
+                            <td>{{ countGrades(filteredMarks, 4) }} ({{ calculatePercentage(filteredMarks, 4) }}%)</td>
+                          </tr>
+                          <tr>
+                            <td>Удовлетворительно (3)</td>
+                            <td>{{ countGrades(filteredMarks, 3) }} ({{ calculatePercentage(filteredMarks, 3) }}%)</td>
+                          </tr>
+                          <tr>
+                            <td>Неудовлетворительно (2)</td>
+                            <td>{{ countGrades(filteredMarks, 2) }} ({{ calculatePercentage(filteredMarks, 2) }}%)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <!-- Добавляем таблицу со списком студентов -->
+                <div class="row mt-4">
+                  <div class="col">
+                    <div class="card">
+                      <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Список студентов</h6>
+                        <input 
+                          type="text" 
+                          class="form-control form-control-sm w-auto" 
+                          v-model="studentSearch" 
+                          placeholder="Поиск по ФИО..."
+                        >
+                      </div>
+                      <div class="card-body">
+                        <div class="table-responsive">
+                          <table class="table table-striped table-hover">
+                            <thead>
+                              <tr>
+                                <th>ФИО</th>
+                                <th>Оценка</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="student in filteredStudentsList" :key="student.id">
+                                <td>{{ student.name }}</td>
+                                <td>
+                                  <span :class="getGradeBadgeClass(student.grade)">
+                                    {{ student.grade }}
+                                  </span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -162,14 +241,14 @@ export default {
       chartOptions: {
         responsive: true,
         maintainAspectRatio: false,
-        events: [],
+        events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
         plugins: {
           legend: {
             display: true,
             position: 'top'
           },
           tooltip: {
-            enabled: false
+            enabled: true
           }
         },
         scales: {
@@ -188,6 +267,13 @@ export default {
         'Отчислен': 'bg-danger',
         'Продолжает обучение': 'bg-primary',
         'Возвращён': 'bg-success'
+      },
+      studentSearch: '',
+      gradeColors: {
+        5: 'bg-success',
+        4: 'bg-primary',
+        3: 'bg-warning',
+        2: 'bg-danger'
       }
     }
   },
@@ -325,7 +411,24 @@ export default {
           }]
         }
       }
-    }
+    },
+
+    filteredStudentsList() {
+      if (!this.filteredMarks.length) return []
+      
+      const students = this.filteredMarks.map(mark => ({
+        id: mark['ID студента'] || Math.random().toString(),
+        name: mark['ФИО студента'] || 'Не указано',
+        grade: Number(mark['Оценка']) || 0
+      }))
+
+      if (!this.studentSearch) return students
+
+      const search = this.studentSearch.toLowerCase()
+      return students.filter(student => 
+        student.name.toLowerCase().includes(search)
+      )
+    },
   },
   methods: {
     async loadCSVData() {
@@ -405,7 +508,27 @@ export default {
 
     getStatusBadgeClass(status) {
       return `badge ${this.statusColors[status] || 'bg-secondary'}`
-    }
+    },
+
+    calculateAverage(marks) {
+      if (!marks.length) return '0.00'
+      const sum = marks.reduce((acc, mark) => acc + Number(mark['Оценка'] || 0), 0)
+      return (sum / marks.length).toFixed(2)
+    },
+
+    countGrades(marks, grade) {
+      return marks.filter(mark => Number(mark['Оценка']) === grade).length
+    },
+
+    calculatePercentage(marks, grade) {
+      if (!marks.length) return '0.0'
+      const count = this.countGrades(marks, grade)
+      return ((count / marks.length) * 100).toFixed(1)
+    },
+
+    getGradeBadgeClass(grade) {
+      return `badge ${this.gradeColors[grade] || 'bg-secondary'}`
+    },
   },
   mounted() {
     this.loadCSVData()

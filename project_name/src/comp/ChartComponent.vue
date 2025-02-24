@@ -29,6 +29,24 @@ export default {
           legend: {
             display: true,
             position: 'top'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.label || '';
+                let value = context.raw || 0;
+                
+                // проценты
+                if (context.chart.config.type === 'pie') {
+                  let total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                  let percentage = ((value / total) * 100).toFixed(1);
+                  return `${label}: ${value} (${percentage}%)`;
+                }
+                
+                // стобчатые - тупо значение
+                return `${label}: ${value}`;
+              }
+            }
           }
         }
       }
