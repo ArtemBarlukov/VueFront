@@ -11,5 +11,13 @@ module.exports = defineConfig({
         __VUE_PROD_DEVTOOLS__: false
       })
     ]
+  },
+  devServer: {
+    proxy: {
+      '/api': { 
+        target: 'http://127.0.0.1:8000', 
+        changeOrigin: true, 
+      }
+    }
   }
 })
