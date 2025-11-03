@@ -209,7 +209,7 @@ const fetchData = async (url, options = {}, isRetry = false) => {
     try {
       const response = await fetch(url, { ...options, headers });
 
-      if (response.status === 401 && !isRetry && refreshToken.value && url !== `${DJANGO_SERVER_URL}${LOGIN_PATH}`) {
+      if (response.status === 401 && !isRetry && refreshToken.value && url !== `${API_BASE_URL}${LOGIN_PATH}`) {
         console.warn("Access token possibly expired, attempting to refresh...");
         try {
           const newTokens = await refreshAccessToken();
@@ -276,7 +276,7 @@ const login = async () => {
   }
   loginLoading.value = true; loginError.value = null;
   try {
-    const response = await fetch(`${DJANGO_SERVER_URL}${LOGIN_PATH}`, {
+    const response = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: loginForm.email, password: loginForm.password })
@@ -418,11 +418,6 @@ const toggleMobileMenu = () => {
 const setActiveTabMobile = (tabName) => {
   setActiveTab(tabName);
   mobileMenuOpen.value = false;
-};
-
-const onItemsPerPageChange = () => {
-  currentPage.value = 1;
-  loadStudents();
 };
 
 </script>
