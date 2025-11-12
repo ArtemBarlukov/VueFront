@@ -149,7 +149,8 @@ import 'bootstrap';
 import { Modal } from 'bootstrap';
 
 const API_BASE_URL = '/api';
-const DJANGO_SERVER_URL = 'http://localhost:8000'; 
+// const DJANGO_SERVER_URL = 'http://localhost:8000'; 
+const DJANGO_SERVER_URL = ''; 
 const LOGIN_PATH = '/login/'; 
 const TOKEN_REFRESH_PATH = '/auth/token/refresh/';
 
@@ -350,11 +351,13 @@ const loadFilterOptions = async () => {
     globalLoading.value = true; globalError.value = null;
     console.log("App.vue: Attempting to load filter options. IsAuthenticated:", isAuthenticated.value);
     try {
-        const groupsData = await fetchData(`${API_BASE_URL}/groups/`);
+        // const groupsData = await fetchData(`${API_BASE_URL}/groups/`);
+        const groupsData = await fetchData(`${DJANGO_SERVER_URL}/groups/`);
         if (groupsData) { filterOptions.groups = groupsData.map(g => g.title).sort(); }
         else { console.warn("No group data received from /api/groups/ or error occurred."); filterOptions.groups = []; }
 
-        const subjectsData = await fetchData(`${API_BASE_URL}/disciples/`);
+        // const subjectsData = await fetchData(`${API_BASE_URL}/disciples/`);
+        const subjectsData = await fetchData(`${DJANGO_SERVER_URL}/disciples/`);
         if (subjectsData) { filterOptions.subjects = subjectsData.map(d => d.disciple_name).filter(Boolean).sort(); }
         else { console.warn("No subject data received from /api/disciples/ or error occurred."); filterOptions.subjects = [];}
 
