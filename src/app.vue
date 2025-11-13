@@ -279,7 +279,8 @@ const login = async () => {
   }
   loginLoading.value = true; loginError.value = null;
   try {
-    const response = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
+    // const response = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
+    const response = await fetch(`${DJANGO_SERVER_URL}${LOGIN_PATH}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: loginForm.email, password: loginForm.password })
