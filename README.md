@@ -45,12 +45,13 @@
 
 ## Требования
 
-- Node.js версии 16.0 или выше
-- npm версии 7.0 или выше
-- Python 3.8 или выше (для Django backend)
+- **Node.js** версии 16.0 или выше
+- **npm** версии 7.0 или выше
+- **Python 3.12.x** (рекомендуется для Django backend)
+- **PostgreSQL** или **SQL Server** (для базы данных)
 - Django backend сервер, запущенный на порту 8000
 
-**Важно:** Для работы приложения необходимо развернуть и запустить Django backend. Репозиторий бэкенда доступен по адресу: [https://github.com/dogee4803/IRNTU-Dashboard_django_backend](https://github.com/dogee4803/IRNTU-Dashboard_django_backend)
+**Важно:** Для работы приложения необходимо развернуть и запустить Django backend. Репозиторий бэкенда доступен по адресу: [https://github.com/kopikou/IRNTU-Dashboard_django_backend-main](https://github.com/kopikou/IRNTU-Dashboard_django_backend-main)
 
 ## Установка и настройка
 
@@ -61,38 +62,90 @@
 #### 1.1. Клонирование репозитория бэкенда
 
 ```bash
-git clone https://github.com/dogee4803/IRNTU-Dashboard_django_backend.git
-cd IRNTU-Dashboard_django_backend
+git clone https://github.com/kopikou/IRNTU-Dashboard_django_backend-main.git
+cd IRNTU-Dashboard_django_backend-main
 ```
 
 #### 1.2. Создание и активация виртуального окружения
 
+**Рекомендуется использовать Python 3.12.x** для совместимости со всеми зависимостями.
+
 **Windows:**
 ```bash
-<Путь к проекту>\venv\Scripts\activate
-# или
-<Путь к проекту>\venv\Scripts\Activate.ps1
+# Создание виртуального окружения с Python 3.12
+py -3.12 -m venv venv
+
+# Активация
+.\venv\Scripts\Activate.ps1
 ```
 
 **Linux/macOS:**
 ```bash
-source <Путь к проекту>/venv/bin/activate
+# Создание виртуального окружения
+python3.12 -m venv venv
+
+# Активация
+source venv/bin/activate
 ```
 
 #### 1.3. Установка зависимостей
 
 ```bash
+# Обновление pip, setuptools и wheel
+python -m pip install --upgrade pip setuptools wheel
+
+# Установка зависимостей
 pip install -r requirements.txt
+
+# Установка драйвера для PostgreSQL (если используется PostgreSQL)
+pip install psycopg2-binary
 ```
 
-#### 1.4. Применение миграций
+#### 1.4. Настройка базы данных
+
+Проект поддерживает PostgreSQL и SQL Server. Настройте базу данных в файле `app/settings.py`:
+
+**Для PostgreSQL:**
+```python
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'project_db',
+        'USER': 'postgres',
+        'PASSWORD': 'your_password',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    },
+}
+```
+
+**Для SQL Server:**
+```python
+DATABASES = {
+    'default': {
+        'ENGINE': 'mssql',
+        'NAME': 'irntu_dashboard',
+        'HOST': 'localhost',
+        'PORT': '1433',
+        'USER': 'sa',
+        'PASSWORD': 'your_password',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'trusted_connection': 'yes',
+            'extra_params': 'TrustServerCertificate=yes;',
+        },
+    }
+}
+```
+
+#### 1.5. Применение миграций
 
 ```bash
 python manage.py makemigrations
 python manage.py migrate
 ```
 
-#### 1.5. Создание суперпользователя
+#### 1.6. Создание суперпользователя
 
 Для авторизации в приложении необходимо создать администратора Django:
 
@@ -102,7 +155,7 @@ python manage.py createsuperuser
 
 Создайте супер пользователя по инструкции в терминале и введите поля ввода для email (логина) и для пароля. Эти данные будут использоваться для входа в фронтенд приложение.
 
-#### 1.6. Запуск Django сервера
+#### 1.7. Запуск Django сервера
 
 ```bash
 python manage.py runserver
@@ -298,7 +351,7 @@ fetchData(url, options, isRetry)
 
 #### Данные для фильтров
 - `GET /api/groups/` - Список групп
-- `GET /api/disciples/` - Список предметов
+- `GET /api/disciplines/` - Список дисциплин (предметов)
 
 #### Статистика
 - `GET /api/statistics/marks/` - Статистика оценок
@@ -307,7 +360,7 @@ fetchData(url, options, isRetry)
 
 #### Академический отпуск
 - `GET /api/academic/performance/` - Успеваемость студентов в академическом отпуске
-- `GET /api/academic/returns/` - Даты возврата из академического отпуска
+- `GET /api/academic/returns/` - Даты возврата из академического отпуска (временно отключен в бэкенде)
 
 ### Формат запросов и ответов
 
@@ -478,9 +531,21 @@ const API_BASE_URL = 'https://api.example.com';  // Для production
 
 ### Связанные проекты
 
-- **Django Backend**: [https://github.com/dogee4803/IRNTU-Dashboard_django_backend](https://github.com/dogee4803/IRNTU-Dashboard_django_backend)
+- **Django Backend**: [https://github.com/kopikou/IRNTU-Dashboard_django_backend-main](https://github.com/kopikou/IRNTU-Dashboard_django_backend-main)
   
   Репозиторий содержит Django приложение, которое предоставляет API для фронтенд приложения. Обязательно разверните и запустите бэкенд перед работой с фронтенд приложением.
+
+## Важные изменения в API
+
+### Обновленные эндпоинты
+
+- **Дисциплины**: Изменен путь с `/api/disciples/` на `/api/disciplines/`
+- **Академический отпуск**: Эндпоинт `/api/academic/returns/` временно отключен в бэкенде
+
+### Отображение данных
+
+- В целях конфиденциальности вместо ФИО студентов отображается их ID
+- Все таблицы используют ID студента для идентификации
 
 ## Лицензия
 
