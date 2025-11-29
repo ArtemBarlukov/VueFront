@@ -279,8 +279,8 @@ const login = async () => {
   }
   loginLoading.value = true; loginError.value = null;
   try {
-    // const response = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
-    const response = await fetch(`${DJANGO_SERVER_URL}${LOGIN_PATH}`, {
+    // Исправлено: используем API_BASE_URL для консистентности с остальными запросами
+    const response = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: loginForm.email, password: loginForm.password })
@@ -354,15 +354,26 @@ const loadFilterOptions = async () => {
     globalLoading.value = true; globalError.value = null;
     console.log("App.vue: Attempting to load filter options. IsAuthenticated:", isAuthenticated.value);
     try {
-        // const groupsData = await fetchData(`${API_BASE_URL}/groups/`);
-        const groupsData = await fetchData(`${DJANGO_SERVER_URL}/groups/`);
-        if (groupsData) { filterOptions.groups = groupsData.map(g => g.title).sort(); }
+        // Исправлено: используем API_BASE_URL для консистентности и поле 'name' вместо 'title'
+        const groupsData = await fetchData(`${API_BASE_URL}/groups/`);
+        if (groupsData) { 
+            // StudentGroupSerializer возвращает поле 'name', а не 'title'
+            filterOptions.groups = groupsData.map(g => g.name || g.title).filter(Boolean).sort(); 
+        }
         else { console.warn("No group data received from /api/groups/ or error occurred."); filterOptions.groups = []; }
 
-        // const subjectsData = await fetchData(`${API_BASE_URL}/disciples/`);
-        const subjectsData = await fetchData(`${DJANGO_SERVER_URL}/disciples/`);
-        if (subjectsData) { filterOptions.subjects = subjectsData.map(d => d.disciple_name).filter(Boolean).sort(); }
-        else { console.warn("No subject data received from /api/disciples/ or error occurred."); filterOptions.subjects = [];}
+        // Исправлено: используем /api/disciplines/ вместо /api/disciples/
+        // DisciplineSerializer возвращает объекты с полями 'discipline_id' и 'name'
+        const subjectsData = await fetchData(`${API_BASE_URL}/disciplines/`);
+        if (subjectsData) { 
+            // Проверяем структуру ответа - DisciplineSerializer возвращает массив с полем 'name'
+            if (Array.isArray(subjectsData) && subjectsData.length > 0) {
+                filterOptions.subjects = subjectsData.map(d => d.name).filter(Boolean).sort(); 
+            } else {
+                filterOptions.subjects = [];
+            }
+        }
+        else { console.warn("No subject data received from /api/disciplines/ or error occurred."); filterOptions.subjects = [];}
 
         console.log("App.vue: Filter options loaded (or attempted). Groups:", filterOptions.groups.length, "Subjects:", filterOptions.subjects.length);
     } catch (e) {

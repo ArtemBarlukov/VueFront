@@ -55,9 +55,9 @@
          </div>
          <div class="table-responsive">
            <table class="table table-striped table-hover">
-             <thead><tr><th>ФИО</th><th>Группа</th><th>Курс</th><th>Ср.балл</th><th>Актив.</th><th>Посещ.</th><th>Риск отч.</th><th>Рейтинг</th></tr></thead>
+             <thead><tr><th>ID студента</th><th>Группа</th><th>Курс</th><th>Ср.балл</th><th>Актив.</th><th>Посещ.</th><th>Риск отч.</th><th>Рейтинг</th></tr></thead>
              <tbody>
-               <tr v-for="student in paginatedStudents" :key="student.id + '-' + Math.random()"><td>{{ student.name }}</td><td>{{ student.group }}</td><td>{{ student.course }}</td><td>{{ student.avgGrade?.toFixed(2) ?? 'N/A' }}</td><td>{{ student.activity?.toFixed(0) ?? 'N/A' }}</td><td>{{ formatRatingAttendance(student.attendancePercent) }}</td><td><span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span></td><td>{{ student.rating?.toFixed(2) ?? 'N/A' }}</td></tr>
+               <tr v-for="student in paginatedStudents" :key="student.id + '-' + Math.random()"><td>{{ student.id || student.name || 'N/A' }}</td><td>{{ student.group }}</td><td>{{ student.course }}</td><td>{{ student.avgGrade?.toFixed(2) ?? 'N/A' }}</td><td>{{ student.activity?.toFixed(0) ?? 'N/A' }}</td><td>{{ formatRatingAttendance(student.attendancePercent) }}</td><td><span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span></td><td>{{ student.rating?.toFixed(2) ?? 'N/A' }}</td></tr>
                <tr v-if="!studentRatingData.students?.length"><td colspan="8" class="text-center text-muted">Студенты не найдены</td></tr>
              </tbody>
            </table>
@@ -130,9 +130,9 @@ const fetchStudentRating = async () => {
             chartData.value = chartResponse.chartData || [];
             studentRatingData.value = { chartData: chartData.value };
         }
-        
+
         const tableParams = new URLSearchParams(params);
-        tableParams.delete('limit');
+        tableParams.set('limit', '10000');  // Большое число, чтобы получить всех студентов
         
         const tableResponse = await fetchData(`${API_BASE_URL}/student-rating/?${tableParams.toString()}`);
         if (tableResponse) {
@@ -161,7 +161,7 @@ const resetFilters = () => {
   fetchStudentRating();
 };
 
-const formatRatingAttendance = (p) => (typeof p === 'number' ? `${(p * 100).toFixed(1)}%` : 'N/A');
+const formatRatingAttendance = (p) => (typeof p === 'number' ? `${p.toFixed(1)}%` : 'N/A');
 const formatDropoutRisk = (r) => (typeof r === 'number' ? `${(r * 100).toFixed(1)}%` : 'N/A');
 const getDropoutRiskClass = (r) => { if (typeof r !== 'number') return {'badge': true, 'bg-secondary': true }; const normR = Math.max(0, Math.min(1, r)); return {'badge': true,'bg-success': normR < 0.3,'bg-warning': normR >= 0.3 && normR < 0.6,'bg-danger': normR >= 0.6 }; };
 
@@ -220,7 +220,8 @@ const filteredStudents = computed(() => {
     if (filters.search && filters.search.trim() !== '') {
         const searchTerm = filters.search.toLowerCase().trim();
         return allStudentsData.value.filter(student => {
-            return (student.name && student.name.toLowerCase().includes(searchTerm)) ||
+            const studentId = String(student.id || student.name || '');
+            return studentId.toLowerCase().includes(searchTerm) ||
                    (student.group && student.group.toLowerCase().includes(searchTerm));
         });
     }

@@ -114,7 +114,7 @@
                         type="text" 
                         class="form-control" 
                         v-model="searchInput" 
-                        placeholder="Поиск по ФИО..."
+                        placeholder="Поиск по ID..."
                         @input="debouncedSearch"
                       >
                       <button 
@@ -133,7 +133,7 @@
                         <thead>
                           <tr>
                             <th @click="sortBy('name')">
-                              ФИО студента
+                              ID студента
                               <i v-if="sortKey === 'name'" :class="sortIcon">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</i>
                             </th>
                             <th @click="sortBy('group')">
@@ -152,7 +152,7 @@
                         </thead>
                         <tbody>
                           <tr v-for="student in paginatedStudents" :key="student.id">
-                            <td>{{ student.name }}</td>
+                            <td>{{ student.studentId || student.id || student.name || 'N/A' }}</td>
                             <td>{{ student.group }}</td>
                             <td>{{ student.subject }}</td>
                             <td :class="getGradeClass(student.grade)" class="grade-cell">{{ student.grade }}</td>
@@ -481,7 +481,8 @@ const filteredStudents = computed(() => {
     const searchTerm = filters.search.toLowerCase().trim();
     result = result.filter(student => {
       if (!student) return false;
-      return (student.name && student.name.toLowerCase().includes(searchTerm)) ||
+      const studentId = String(student.studentId || student.id || student.name || '');
+      return studentId.toLowerCase().includes(searchTerm) ||
              (student.group && student.group.toLowerCase().includes(searchTerm)) ||
              (student.subject && student.subject.toLowerCase().includes(searchTerm));
     });
@@ -584,10 +585,14 @@ const processStudentData = (students) => {
   students.forEach(student => {
     if (!student) return;
  
+    // Сохраняем оригинальный ID студента
+    const studentId = student.id || student.name || 'N/A';
+    
     if (!student.subjects || !Array.isArray(student.subjects) || student.subjects.length === 0) {
       expandedRecords.push({
         id: `${student.id || 'unknown'}-empty`,
-        name: student.name || 'Неизвестный студент',
+        studentId: studentId,  // Оригинальный ID студента
+        name: studentId,
         group: student.group || '-',
         subject: 'Нет данных',
         grade: '-'
@@ -604,7 +609,8 @@ const processStudentData = (students) => {
       if (grades.length === 0) {
         expandedRecords.push({
           id: `${student.id || 'unknown'}-${subjectIndex}-empty`,
-          name: student.name || 'Неизвестный студент',
+          studentId: studentId,  // Оригинальный ID студента
+          name: studentId,
           group: student.group || '-',
           subject: subject,
           grade: '-'
@@ -626,7 +632,8 @@ const processStudentData = (students) => {
           
           expandedRecords.push({
             id: `${student.id || 'unknown'}-${subjectIndex}-${gradeIndex}`,
-            name: student.name || 'Неизвестный студент',
+            studentId: studentId,  // Оригинальный ID студента
+            name: studentId,
             group: student.group || '-',
             subject: subject,
             grade: normalizedGrade !== undefined && normalizedGrade !== null ? normalizedGrade : '-'

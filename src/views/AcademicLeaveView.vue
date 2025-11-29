@@ -69,7 +69,7 @@
              </div>
              <div class="d-flex gap-2 align-items-center">
                <div class="input-group input-group-sm">
-                 <input type="text" class="form-control" v-model="searchInput" placeholder="Поиск по ФИО..." @input="debouncedSearch">
+                 <input type="text" class="form-control" v-model="searchInput" placeholder="Поиск по ID..." @input="debouncedSearch">
                  <button 
                    class="btn btn-outline-secondary" 
                    type="button" 
@@ -96,9 +96,9 @@
              </div>
              <div class="table-responsive">
                <table class="table table-bordered table-hover">
-                 <thead class="table-light"><tr><th @click="sortTable('name')" style="cursor: pointer">ФИО {{ getSortIcon('name') }}</th><th @click="sortTable('group')" style="cursor: pointer">Группа {{ getSortIcon('group') }}</th><th @click="sortTable('debts')" style="cursor: pointer">Долги {{ getSortIcon('debts') }}</th></tr></thead>
+                 <thead class="table-light"><tr><th @click="sortTable('name')" style="cursor: pointer">ID студента {{ getSortIcon('name') }}</th><th @click="sortTable('group')" style="cursor: pointer">Группа {{ getSortIcon('group') }}</th><th @click="sortTable('debts')" style="cursor: pointer">Долги {{ getSortIcon('debts') }}</th></tr></thead>
                  <tbody>
-                   <tr v-for="student in paginatedStudents" :key="student.id"><td>{{ student.name }}</td><td>{{ student.group }}</td><td><span :class="getDebtBadgeClass(student.debts)">{{ student.debts }}</span></td></tr>
+                   <tr v-for="student in paginatedStudents" :key="student.id"><td>{{ student.id || student.name || 'N/A' }}</td><td>{{ student.group }}</td><td><span :class="getDebtBadgeClass(student.debts)">{{ student.debts }}</span></td></tr>
                    <tr v-if="!paginatedStudents.length"><td colspan="3" class="text-center text-muted">Студенты не найдены</td></tr>
                  </tbody>
                </table>
@@ -166,7 +166,7 @@
               </div>
               <div class="d-flex gap-2 align-items-center">
                 <div class="input-group input-group-sm">
-                  <input type="text" class="form-control" v-model="searchReturnsInput" placeholder="Поиск по ФИО..." @input="debouncedReturnsSearch">
+                  <input type="text" class="form-control" v-model="searchReturnsInput" placeholder="Поиск по ID..." @input="debouncedReturnsSearch">
                   <button 
                     class="btn btn-outline-secondary" 
                     type="button" 
@@ -185,9 +185,9 @@
             <div class="card-body">
               <div class="table-responsive">
                 <table class="table table-striped table-hover">
-                  <thead><tr><th>ФИО</th><th>Группа</th><th>Дата возврата</th><th>Статус</th></tr></thead>
+                  <thead><tr><th>ID студента</th><th>Группа</th><th>Дата возврата</th><th>Статус</th></tr></thead>
                   <tbody>
-                    <tr v-for="student in paginatedReturnsStudents" :key="student.id"><td>{{ student.name }}</td><td>{{ student.group }}</td><td>{{ formatDate(student.returnDate) }}</td><td><span :class="getStatusBadgeClass(student.status)">{{ student.status }}</span></td></tr>
+                    <tr v-for="student in paginatedReturnsStudents" :key="student.id"><td>{{ student.id || student.name || 'N/A' }}</td><td>{{ student.group }}</td><td>{{ formatDate(student.returnDate) }}</td><td><span :class="getStatusBadgeClass(student.status)">{{ student.status }}</span></td></tr>
                     <tr v-if="!paginatedReturnsStudents.length"><td colspan="4" class="text-center text-muted">Студенты не найдены</td></tr>
                   </tbody>
                 </table>
@@ -287,13 +287,17 @@ const getSortIcon = (key) => (sortConfig.key !== key) ? '↕' : (sortConfig.dire
 const debtColors = { 0: 'bg-success', 1: 'bg-warning', 2: 'bg-warning' };
 const getDebtBadgeClass = (debts) => `badge ${debtColors[debts] ?? 'bg-danger'}`;
 
+// Эндпоинт /academic/returns/ временно отключен в бэкенде
 const fetchAcademicReturns = async () => {
      if (!fetchData) return;
      isLoadingReturns.value = true;
      errorReturns.value = null;
      try {
-         const data = await fetchData(`${API_BASE_URL}/academic/returns/`);
-         if (data !== null) returnsData.value = data;
+         // const data = await fetchData(`${API_BASE_URL}/academic/returns/`);
+         // if (data !== null) returnsData.value = data;
+         // Временно отключено, так как эндпоинт закомментирован в бэкенде
+         errorReturns.value = 'Эндпоинт временно недоступен';
+         returnsData.value = null;
      } catch (err) {
          errorReturns.value = err.message || 'Не удалось загрузить данные о возвратах.';
          returnsData.value = null;
@@ -392,7 +396,8 @@ const filteredReturnsStudents = computed(() => {
         const searchTerm = filtersReturns.search.toLowerCase().trim();
         students = students.filter(student => {
             if (!student) return false;
-            return (student.name && student.name.toLowerCase().includes(searchTerm)) ||
+            const studentId = String(student.id || student.name || '');
+            return studentId.toLowerCase().includes(searchTerm) ||
                    (student.group && student.group.toLowerCase().includes(searchTerm));
         });
     }
