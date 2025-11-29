@@ -3,8 +3,8 @@
     <!-- Header в стиле ИРНИТУ -->
     <header class="istu-header fixed-top">
       <div class="istu-toolbar">
-        <!-- Мобильная кнопка меню -->
-        <div class="mobile-menu-toggle d-lg-none">
+        <!-- Мобильная кнопка меню - показывать пока не xxl (1400px) -->
+        <div class="mobile-menu-toggle mobile-menu-toggle-custom">
           <button class="btn btn-link text-dark" @click="toggleMobileMenu">
             <i class="material-icons">menu</i>
           </button>
@@ -17,19 +17,13 @@
               <img src="@/assets/istu_logo.png" alt="ИРНИТУ">
             </div>
           </a>
-          <a class="istu-btn istu-btn-title-text d-none d-sm-block" href="#" @click.prevent="activeTab = 'statistics'; mobileMenuOpen = false;">
+          <a class="istu-btn istu-btn-title-text d-none d-md-block" href="#" @click.prevent="activeTab = 'statistics'; mobileMenuOpen = false;">
             ИНСТРУМЕНТЫ ДЛЯ ОБРАБОТКИ ОТКРЫТЫХ ДАННЫХ СТУДЕНТОВ
           </a>
         </div>
         
-        <!-- Навигационные вкладки (стилизованные под q-tabs) -->
-        <div class="istu-tabs d-none d-lg-flex">
-          <!-- Целевой навбар имеет одну вкладку "Зачетная книжка". 
-               Если вы хотите ее, замените ваши вкладки на что-то вроде:
-          <a class="istu-tab" :class="{ active: activeTab === 'recordBook' }" @click="setActiveTab('recordBook')" href="#">
-            <i class="material-icons">fact_check</i>Зачетная книжка
-          </a>
-          -->
+        <!-- Навигационные вкладки - показывать только на xxl и выше (≥1400px) -->
+        <div class="istu-tabs d-none d-xxl-flex">
           <a class="istu-tab" :class="{ active: activeTab === 'statistics' }" @click="setActiveTab('statistics')" href="#">
             <i class="material-icons">analytics</i> СТАТИСТИКА ОЦЕНОК
           </a>
@@ -44,7 +38,7 @@
           </a>
         </div>
         
-        <!-- Авторизация (с выпадающим меню для пользователя) -->
+        <!-- Авторизация (с выпадающим меню для пользователя) - ВСЕГДА ВИДИМА -->
         <div class="istu-toolbar-auth">
           <div v-if="isAuthenticated" class="nav-item dropdown header-auth-dropdown">
             <a class="nav-link dropdown-toggle istu-user-dropdown-toggle" href="#" id="navbarDropdownUserMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -63,14 +57,14 @@
           <div v-else>
             <button class="btn btn-istu-login" @click="openLoginModal">
               <i class="material-icons">login</i>
-              <span class="d-none d-md-inline-block ms-1">Войти</span>
+              <span class="d-none d-sm-inline-block ms-1">Войти</span>
             </button>
           </div>
         </div>
       </div>
       
-      <!-- Мобильное меню -->
-      <div class="mobile-menu d-lg-none" :class="{ 'mobile-menu-open': mobileMenuOpen }">
+      <!-- Мобильное меню - показывать пока не xxl (1400px) -->
+      <div class="mobile-menu mobile-menu-toggle-custom" :class="{ 'mobile-menu-open': mobileMenuOpen }">
         <a class="mobile-menu-item" :class="{ active: activeTab === 'statistics' }" @click="setActiveTabMobile('statistics')">
           <i class="material-icons">analytics</i> СТАТИСТИКА ОЦЕНОК
         </a>
@@ -120,12 +114,6 @@
 
     <!-- Main Content -->
     <div class="container mt-5 pt-5"> 
-      <!-- Индикатор загрузки и ошибок теперь управляются дочерними компонентами -->
-      <!--
-      <div v-if="isLoading" class="alert alert-info">Загрузка данных...</div>
-      <div v-if="error" class="alert alert-danger">{{ error }}</div>
-      -->
-
       <template v-if="!globalLoading && !globalError">
         <keep-alive>
           <component
@@ -143,16 +131,12 @@
 </template>
 
 <script setup>
-
-  // test commit 2
-import { ref, reactive, computed, watch, onMounted, provide, defineAsyncComponent, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, provide, defineAsyncComponent, nextTick } from 'vue';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 import { Modal } from 'bootstrap';
 
 const API_BASE_URL = '/api';
-// const DJANGO_SERVER_URL = 'http://localhost:8000'; 
-const DJANGO_SERVER_URL = '';
 const LOGIN_PATH = '/login/'; 
 const TOKEN_REFRESH_PATH = '/auth/token/refresh/';
 
@@ -196,7 +180,6 @@ const ratingChartOptions = ref({
 });
 
 const mobileMenuOpen = ref(false);
-
 
 const fetchData = async (url, options = {}, isRetry = false) => {
     const headers = {
@@ -279,7 +262,6 @@ const login = async () => {
   }
   loginLoading.value = true; loginError.value = null;
   try {
-    // Исправлено: используем API_BASE_URL для консистентности с остальными запросами
     const response = await fetch(`${API_BASE_URL}${LOGIN_PATH}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -326,7 +308,6 @@ const logout = async () => {
   window.location.reload();
 };
 
-
 const logoutAndShowLogin = (message) => { logout(); setTimeout(() => { alert(message); openLoginModal(); }, 100); };
 
 const refreshAccessToken = async () => {
@@ -354,19 +335,14 @@ const loadFilterOptions = async () => {
     globalLoading.value = true; globalError.value = null;
     console.log("App.vue: Attempting to load filter options. IsAuthenticated:", isAuthenticated.value);
     try {
-        // Исправлено: используем API_BASE_URL для консистентности и поле 'name' вместо 'title'
         const groupsData = await fetchData(`${API_BASE_URL}/groups/`);
         if (groupsData) { 
-            // StudentGroupSerializer возвращает поле 'name', а не 'title'
             filterOptions.groups = groupsData.map(g => g.name || g.title).filter(Boolean).sort(); 
         }
         else { console.warn("No group data received from /api/groups/ or error occurred."); filterOptions.groups = []; }
 
-        // Исправлено: используем /api/disciplines/ вместо /api/disciples/
-        // DisciplineSerializer возвращает объекты с полями 'discipline_id' и 'name'
         const subjectsData = await fetchData(`${API_BASE_URL}/disciplines/`);
         if (subjectsData) { 
-            // Проверяем структуру ответа - DisciplineSerializer возвращает массив с полем 'name'
             if (Array.isArray(subjectsData) && subjectsData.length > 0) {
                 filterOptions.subjects = subjectsData.map(d => d.name).filter(Boolean).sort(); 
             } else {
@@ -436,11 +412,8 @@ const setActiveTabMobile = (tabName) => {
   setActiveTab(tabName);
   mobileMenuOpen.value = false;
 };
-
 </script>
-
 <style>
-
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
 body {
@@ -473,6 +446,7 @@ body {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .istu-btn {
@@ -517,15 +491,22 @@ body {
   font-weight: 500;
   margin-left: 8px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
+/* ВКЛАДКИ - скрыть до 1700px */
 .istu-tabs {
   display: flex;
   align-items: stretch; 
   height: 100%;
   margin-left: 16px; 
-  flex-grow: 1; 
+  max-width: 50%;
+  overflow: hidden;
   justify-content: flex-start; 
+  min-width: 0;
+  display: none; /* по умолчанию скрыты */
 }
 
 .istu-tab {
@@ -562,6 +543,7 @@ body {
   align-items: center;
   height: 100%;
   padding: 0 8px;
+  flex-shrink: 0;
 }
 
 .istu-user-dropdown-toggle {
@@ -573,6 +555,7 @@ body {
   height: 100%;
   font-size: 0.875rem;
   font-weight: 500;
+  flex-shrink: 0;
 }
 .istu-user-dropdown-toggle::after {
   display: none !important; 
@@ -596,28 +579,34 @@ body {
 }
 
 .btn-istu-login {
-  display: flex; 
+  display: flex !important; 
   align-items: center; 
   background-color: #1976d2; 
   color: white; 
   border: none; 
-  padding: 6px 12px;
+  padding: 6px 12px !important;
   border-radius: 4px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.3s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .btn-istu-login:hover { 
   background-color: #1565c0; 
 }
 .btn-istu-login .material-icons {
   margin-right: 4px;
+  flex-shrink: 0;
 }
 
+/* БУРГЕР - показать до 1700px */
 .mobile-menu-toggle {
   padding: 0 8px;
   z-index: 1031;
+  flex-shrink: 0;
+  display: flex; /* по умолчанию показан */
 }
 .mobile-menu-toggle .btn {
   padding: 0;
@@ -634,7 +623,7 @@ body {
   width: 100%;
   background-color: white;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  z-index: 1029; 
+  z-index: 1100 !important;
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.3s ease-out;
@@ -660,54 +649,63 @@ body {
 .mobile-menu-item i {
   margin-right: 12px;
 }
-
-@media (min-width: 1550px) {
-    .d-lg-none {
-        display: none !important;
-    }
-}
-@media (max-width: 1549px) { 
+/* ГЛАВНОЕ ПРАВИЛО: 1600px переключение */
+@media (max-width: 1599.98px) {
   .istu-tabs {
-    display: none !important; 
+    display: none !important;
   }
   
   .mobile-menu-toggle {
-    display: block !important;
+    display: flex !important;
+    order: 1; /* Бургер слева */
   }
   
   .istu-toolbar-title {
+    order: 2; /* Логотип по центру */
     flex-grow: 1;
+    display: flex;
     justify-content: center;
+    position: static;
+    transform: none;
   }
   
   .istu-toolbar-auth {
-    padding: 0;
+    order: 3; /* Кнопка авторизации справа */
+    margin-left: 0;
   }
   
+  /* Перестраиваем тулбар */
+  .istu-toolbar {
+    justify-content: space-between;
+  }
+}
 
-  .btn-istu-login .ms-1 {
+@media (min-width: 1600px) {
+  .istu-tabs {
+    display: flex !important;
+  }
+  
+  .mobile-menu-toggle {
     display: none !important;
   }
-}
-
-@media (max-width: 450px) {
-  .istu-btn-title-text {
-    font-size: 0.85rem; 
-    max-width: 180px;
-    text-overflow: ellipsis;
-    overflow: hidden;
+  
+  /* Возвращаем обычный порядок */
+  .istu-toolbar-title {
+    flex-grow: 0;
+    justify-content: flex-start;
   }
   
-  .istu-avatar {
-    width: 32px;
-    height: 32px;
+  .istu-toolbar {
+    justify-content: flex-start;
   }
 }
 
+/* Остальные стили */
 .modal.show .modal-dialog {
     transform: none;
     padding-top: 50px;
 }
+
 .page-item.active .page-link {
   background-color: #1976d2;
   border-color: #1976d2;
