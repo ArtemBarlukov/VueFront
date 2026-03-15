@@ -244,7 +244,6 @@ const fetchStatisticsMarks = async () => {
                 sortBy(sortKey.value);
             } else {
                 allStudentsData.value = [];
-                console.warn("Получены некорректные данные студентов:", data.students);
             }
         } else {
             statisticsData.value = null;
@@ -387,11 +386,7 @@ const allStudentsData = ref([]);
 
 const sortKey = ref('name');
 const sortDirection = ref('asc');
-const sortIcon = computed(() => {
-  return sortDirection.value === 'asc' 
-    ? 'material-icons small text-muted ms-1'
-    : 'material-icons small text-muted ms-1';
-});
+const sortIcon = computed(() => 'material-icons small text-muted ms-1');
 
 const sortBy = (key) => {
   if (sortKey.value === key) {
@@ -429,7 +424,7 @@ const sortBy = (key) => {
 const temporaryGradeFilter = ref(null);
 
 const handleGradeDistributionClick = (data) => {
-  console.log('Клик по диаграмме распределения оценок:', data);
+  if (!data || !data.label) return;
   
   const label = data.label;
   
@@ -459,14 +454,6 @@ const handleGradeDistributionClick = (data) => {
     sortDirection.value = 'asc';
     
     temporaryGradeFilter.value = gradeFilter;
-    
-    console.log(`Установлен фильтр по оценке: ${gradeFilter}`);
-    console.log(`Количество записей до фильтрации: ${allStudentsData.value.length}`);
-    
-    const matchingRecords = allStudentsData.value.filter(student => 
-      String(student.grade).toLowerCase() === gradeFilter.toLowerCase()
-    );
-    console.log(`Найдено записей с оценкой ${gradeFilter}: ${matchingRecords.length}`);
     
     currentPage.value = 1;
     
@@ -573,7 +560,6 @@ watch(
 );
 
 onMounted(() => {
-  console.log('StatisticsView mounted');
   fetchStatisticsMarks();
 });
 
@@ -642,14 +628,6 @@ const processStudentData = (students) => {
       }
     });
   });
-  
-  console.log(`Обработано записей: ${expandedRecords.length}`);
-  const gradeStats = {};
-  expandedRecords.forEach(record => {
-    const grade = String(record.grade).toLowerCase();
-    gradeStats[grade] = (gradeStats[grade] || 0) + 1;
-  });
-  console.log('Статистика по оценкам:', gradeStats);
   
   return expandedRecords;
 };

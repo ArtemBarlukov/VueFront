@@ -96,8 +96,6 @@
 import { ref, reactive, computed, watch, onMounted, inject, nextTick } from 'vue';
 import ChartComponent from '@/components/ChartComponent.vue';
 import { Dropdown } from 'bootstrap';
-import Pagination from '@/components/Pagination.vue';
-import PerPageSelector from '@/components/PerPageSelector.vue';
 
 const props = defineProps({
   filterOptions: { type: Object, required: true },
@@ -172,7 +170,7 @@ const bestSubjectsChartData = computed(() => {
   let dataField, chartTitle, colorScheme;
   
   switch (filters.sortBy) {
-    case 'avg_grade':
+    case 'avg':
       dataField = 'avg';
       chartTitle = 'Средний балл';
       colorScheme = {
@@ -180,7 +178,7 @@ const bestSubjectsChartData = computed(() => {
         borderColor: 'rgb(75, 192, 192)'
       };
       break;
-    case 'max_grade':
+    case 'max':
       dataField = 'max';
       chartTitle = 'Максимальный балл';
       colorScheme = {
@@ -194,22 +192,6 @@ const bestSubjectsChartData = computed(() => {
       colorScheme = {
         backgroundColor: 'rgba(255, 159, 64, 0.6)',
         borderColor: 'rgb(255, 159, 64)'
-      };
-      break;
-    case 'attendance':
-      dataField = 'avgAttendance';
-      chartTitle = 'Средняя посещаемость';
-      colorScheme = {
-        backgroundColor: 'rgba(255, 205, 86, 0.6)',
-        borderColor: 'rgb(255, 205, 86)'
-      };
-      break;
-    case 'activity':
-      dataField = 'avgActivity';
-      chartTitle = 'Средняя активность';
-      colorScheme = {
-        backgroundColor: 'rgba(153, 102, 255, 0.6)',
-        borderColor: 'rgb(153, 102, 255)'
       };
       break;
     default:
@@ -243,11 +225,9 @@ const bestSubjectsChartData = computed(() => {
 
 const getSortByLabel = (sortBy) => {
   switch (sortBy) {
-    case 'avg_grade': return 'по среднему баллу';
-    case 'max_grade': return 'по максимальному баллу';
+    case 'avg': return 'по среднему баллу';
+    case 'max': return 'по максимальному баллу';
     case 'count': return 'по количеству оценок';
-    case 'attendance': return 'по посещаемости';
-    case 'activity': return 'по активности';
     default: return 'по среднему баллу';
   }
 };
@@ -255,7 +235,6 @@ const getSortByLabel = (sortBy) => {
 watch(filters, fetchSubjectStats, { deep: true, immediate: false });
 
 onMounted(() => {
-  console.log('SubjectStatsView mounted');
   fetchSubjectStats();
   nextTick(() => {
       if (dropdownMenuSubjectRef.value) {
@@ -292,7 +271,7 @@ const resetPagination = () => {
   currentPage.value = 1;
 };
 
-watch([], resetPagination);
+watch([allStudents], resetPagination);
 </script>
 
 <style scoped>

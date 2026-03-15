@@ -64,9 +64,13 @@
          </div>
          <div class="card mb-4">
            <div class="card-header d-flex justify-content-between align-items-center">
-             <div class="d-flex align-items-center">
-               <h5 class="mb-0">Сводная статистика</h5>
-             </div>
+            <div class="d-flex align-items-center">
+              <h5 class="mb-0">Сводная статистика</h5>
+              <div v-if="temporaryFilter && !temporaryFilter.startsWith('group:') && !temporaryFilter.startsWith('status:') && !temporaryFilter.startsWith('date:')" class="badge bg-info ms-2">
+                Фильтр: {{ getDebtFilterLabel(temporaryFilter) }}
+                <button type="button" class="btn-close btn-close-white ms-2" aria-label="Close" @click="clearChartFilter" style="font-size: 0.5rem;"></button>
+              </div>
+            </div>
              <div class="d-flex gap-2 align-items-center">
                <div class="input-group input-group-sm">
                  <input type="text" class="form-control" v-model="searchInput" placeholder="Поиск по ID..." @input="debouncedSearch">
@@ -125,9 +129,8 @@
         <div v-if="isLoadingReturns" class="alert alert-info">Загрузка дат возврата...</div>
         <div v-if="errorReturns" class="alert alert-danger">{{ errorReturns }}</div>
         <div v-if="returnsData">
-          <!-- Добавляем диаграмму дат возврата внутрь вкладки -->
           <div class="row mb-4">
-            <div class="col-md-0">
+            <div class="col-12">
               <div class="card h-100">
                 <div class="card-header">
                   <h6 class="mb-0 d-flex align-items-center">
@@ -310,8 +313,6 @@ const getStatusBadgeClass = (status) => {
   const colorKey = status in statusColors ? status : null;
   return `badge ${colorKey ? statusColors[colorKey].cssClass || 'bg-secondary' : 'bg-secondary'}`;
 };
-const hexToRgb = (hex) => { try { let r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '108,117,125'; } catch { return '108,117,125'; } };
-
 const emptyChartData = (type = 'bar') => ({ type, data: { labels: [], datasets: [] } });
 
 const debtsChartData = computed(() => {
@@ -333,7 +334,21 @@ const groupAverageDebtsChartData = computed(() => {
 });
 
 const sortedPerformanceStudents = computed(() => {
-     const students = [...(performanceData.value?.students ?? [])];
+     let students = [...(performanceData.value?.students ?? [])];
+
+     if (temporaryFilter.value) {
+         const filter = temporaryFilter.value;
+         if (filter === 'no_debts') {
+             students = students.filter(s => Number(s.debts) === 0);
+         } else if (filter === 'one_debt') {
+             students = students.filter(s => Number(s.debts) === 1);
+         } else if (filter === 'two_debts') {
+             students = students.filter(s => Number(s.debts) === 2);
+         } else if (filter === 'many_debts') {
+             students = students.filter(s => Number(s.debts) >= 3);
+         }
+     }
+
      if (sortConfig.key) {
          students.sort((a, b) => {
              let aValue = a[sortConfig.key]; let bValue = b[sortConfig.key];
@@ -357,22 +372,20 @@ const statusChartData = computed(() => {
   const filteredLabels = labels.filter((_, i) => data[i] > 0);
   const filteredData = data.filter(d => d > 0);
   
-  const backgroundColors = filteredLabels.map(label => {
-    if (label in statusColors) {
-      return statusColors[label].bg;
-    } else {
-      const hue = Math.floor(Math.random() * 360);
-      return `hsla(${hue}, 70%, 60%, 0.7)`;
-    }
+  const fallbackColors = [
+    { bg: 'rgba(108, 117, 125, 0.7)', border: 'rgb(108, 117, 125)' },
+    { bg: 'rgba(255, 193, 7, 0.7)', border: 'rgb(255, 193, 7)' },
+    { bg: 'rgba(13, 202, 240, 0.7)', border: 'rgb(13, 202, 240)' },
+  ];
+
+  const backgroundColors = filteredLabels.map((label, i) => {
+    if (label in statusColors) return statusColors[label].bg;
+    return fallbackColors[i % fallbackColors.length].bg;
   });
   
-  const borderColors = filteredLabels.map(label => {
-    if (label in statusColors) {
-      return statusColors[label].border;
-    } else {
-      const hue = Math.floor(Math.random() * 360);
-      return `hsl(${hue}, 70%, 50%)`;
-    }
+  const borderColors = filteredLabels.map((label, i) => {
+    if (label in statusColors) return statusColors[label].border;
+    return fallbackColors[i % fallbackColors.length].border;
   });
   
   return {
@@ -447,8 +460,12 @@ const debounceFetch = (fetchFunction, delay = 500) => {
 
 watch(filtersPerformance, () => debounceFetch(fetchAcademicPerformance), { deep: true });
 
+const getDebtFilterLabel = (filter) => {
+  const labels = { 'no_debts': 'Нет долгов', 'one_debt': '1 долг', 'two_debts': '2 долга', 'many_debts': '3+ долга' };
+  return labels[filter] || filter;
+};
+
 onMounted(() => {
-  console.log('AcademicLeaveView mounted');
   if (academicSubTab.value === 'performance') {
     fetchAcademicPerformance();
   } else {
@@ -500,7 +517,7 @@ const resetPagination = () => {
   currentPage.value = 1;
 };
 
-watch([], resetPagination);
+watch([sortedPerformanceStudents, filteredReturnsStudents], resetPagination);
 
 watch(academicSubTab, () => {
   resetPagination();
@@ -536,9 +553,10 @@ const clearSearch = () => {
 };
 
 const clearChartFilter = () => {
+  const wasStatusFilter = temporaryFilter.value && temporaryFilter.value.startsWith('status:');
   temporaryFilter.value = null;
   
-  if (temporaryFilter.value && temporaryFilter.value.startsWith('status:')) {
+  if (wasStatusFilter) {
     filtersReturns.status = '';
   }
   
@@ -555,12 +573,7 @@ const scrollToTable = () => {
 };
 
 const handlePerformanceChartClick = (data) => {
-  console.log('Клик по диаграмме успеваемости:', data);
-  
-  if (!data || !data.label) {
-    console.error('Ошибка: данные о клике неполные', data);
-    return;
-  }
+  if (!data || !data.label) return;
   
   const label = data.label;
   
@@ -592,12 +605,7 @@ const handlePerformanceChartClick = (data) => {
 };
 
 const handleGroupDistributionClick = (data) => {
-  console.log('Клик по диаграмме распределения по группам:', data);
-  
-  if (!data || !data.label) {
-    console.error('Ошибка: данные о клике неполные', data);
-    return;
-  }
+  if (!data || !data.label) return;
   
   const selectedGroup = data.label;
   
@@ -619,12 +627,7 @@ const handleGroupDistributionClick = (data) => {
 };
 
 const handleReturnDatesClick = (data) => {
-  console.log('Клик по диаграмме дат возврата:', data);
-  
-  if (!data || !data.label) {
-    console.error('Ошибка: данные о клике неполные', data);
-    return;
-  }
+  if (!data || !data.label) return;
   
   const selectedDate = data.label;
   
@@ -644,12 +647,7 @@ const handleReturnDatesClick = (data) => {
 };
 
 const handleStatusChartClick = (data) => {
-  console.log('Клик по диаграмме статусов:', data);
-  
-  if (!data || !data.label) {
-    console.error('Ошибка: данные о клике неполные', data);
-    return;
-  }
+  if (!data || !data.label) return;
   
   const selectedStatus = data.label;
   

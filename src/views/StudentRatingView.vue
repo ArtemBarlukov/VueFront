@@ -57,8 +57,8 @@
            <table class="table table-striped table-hover">
              <thead><tr><th>ID студента</th><th>Группа</th><th>Курс</th><th>Ср.балл</th><th>Актив.</th><th>Посещ.</th><th>Риск отч.</th><th>Рейтинг</th></tr></thead>
              <tbody>
-               <tr v-for="student in paginatedStudents" :key="student.id + '-' + Math.random()"><td>{{ student.id || student.name || 'N/A' }}</td><td>{{ student.group }}</td><td>{{ student.course }}</td><td>{{ student.avgGrade?.toFixed(2) ?? 'N/A' }}</td><td>{{ student.activity?.toFixed(0) ?? 'N/A' }}</td><td>{{ formatRatingAttendance(student.attendancePercent) }}</td><td><span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span></td><td>{{ student.rating?.toFixed(2) ?? 'N/A' }}</td></tr>
-               <tr v-if="!studentRatingData.students?.length"><td colspan="8" class="text-center text-muted">Студенты не найдены</td></tr>
+              <tr v-for="(student, index) in paginatedStudents" :key="`${student.id}-${index}`"><td>{{ student.id || student.name || 'N/A' }}</td><td>{{ student.group }}</td><td>{{ student.course }}</td><td>{{ student.avgGrade?.toFixed(2) ?? 'N/A' }}</td><td>{{ student.activity?.toFixed(0) ?? 'N/A' }}</td><td>{{ formatRatingAttendance(student.attendancePercent) }}</td><td><span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span></td><td>{{ student.rating?.toFixed(2) ?? 'N/A' }}</td></tr>
+              <tr v-if="!paginatedStudents.length"><td colspan="8" class="text-center text-muted">Студенты не найдены</td></tr>
              </tbody>
            </table>
          </div>
@@ -100,7 +100,7 @@ const isLoading = ref(false);
 const error = ref(null);
 
 const filters = reactive({
-  course: '', group: '', subject: '', sortBy: 'rating', limit: '5'
+  course: '', group: '', subject: '', sortBy: 'rating', limit: 5
 });
 
 
@@ -157,7 +157,7 @@ const resetFilters = () => {
   filters.group = '';
   filters.subject = '';
   filters.sortBy = 'rating';
-  filters.limit = '5';
+  filters.limit = 5;
   fetchStudentRating();
 };
 
@@ -232,7 +232,7 @@ const filteredStudents = computed(() => {
 const totalStudents = computed(() => allStudentsData.value?.length ?? 0);
 
 const totalPages = computed(() => {
-  return Math.ceil(totalStudents.value / itemsPerPage.value);
+  return Math.ceil(totalStudents.value / itemsPerPage.value) || 1;
 });
 
 const paginatedStudents = computed(() => {
@@ -246,10 +246,13 @@ const onPageChange = (page) => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
+const resetPagination = () => {
+  currentPage.value = 1;
+};
+
 watch(filters, fetchStudentRating, { deep: true, immediate: false });
 
 onMounted(() => {
-  console.log('StudentRatingView mounted');
   fetchStudentRating();
 });
 </script>

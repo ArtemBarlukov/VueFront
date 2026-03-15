@@ -196,19 +196,15 @@ const fetchData = async (url, options = {}, isRetry = false) => {
       const response = await fetch(url, { ...options, headers });
 
       if (response.status === 401 && !isRetry && refreshToken.value && url !== `${API_BASE_URL}${LOGIN_PATH}`) {
-        console.warn("Access token possibly expired, attempting to refresh...");
         try {
           const newTokens = await refreshAccessToken();
           if (newTokens && newTokens.access) {
-            console.log("Token refreshed, retrying original request.");
             return await fetchData(url, options, true);
           } else {
-            console.error("Failed to refresh token (new token not received or refresh failed). Logging out.");
             logoutAndShowLogin("Не удалось обновить сессию. Пожалуйста, войдите снова.");
             throw new Error("Не удалось обновить токен авторизации");
           }
         } catch (refreshError) {
-          console.error("Error during token refresh process:", refreshError);
           logoutAndShowLogin("Ошибка обновления сессии. Пожалуйста, войдите снова.");
           throw refreshError;
         }
@@ -224,7 +220,6 @@ const fetchData = async (url, options = {}, isRetry = false) => {
            
            const errorDetail = errorBody?.detail || (Array.isArray(errorBody?.non_field_errors) ? errorBody.non_field_errors.join(', ') : null);
            const errorMsg = errorDetail || `Ошибка сети: ${response.status} ${response.statusText}`;
-           console.error("Ошибка ответа API:", errorMsg, "для", url);
            if (response.status === 401 && (isRetry || !refreshToken.value) && isAuthenticated.value) {
                logoutAndShowLogin("Сессия недействительна. Пожалуйста, войдите снова.");
            }
@@ -233,10 +228,6 @@ const fetchData = async (url, options = {}, isRetry = false) => {
       if (response.status === 204) return null;
       return await response.json();
     } catch (err) {
-      console.error('Общая ошибка при запросе к API:', url, err);
-      if (!err.message.toLowerCase().includes("авторизац")) {
-          // error.value = err.message; 
-      }
       throw err;
     }
 };
@@ -311,35 +302,32 @@ const logout = async () => {
 const logoutAndShowLogin = (message) => { logout(); setTimeout(() => { alert(message); openLoginModal(); }, 100); };
 
 const refreshAccessToken = async () => {
-  if (!refreshToken.value) { console.warn("No refresh token."); return null; }
-  console.log("Refreshing access token...");
+  if (!refreshToken.value) return null;
   try {
     const response = await fetch(`${API_BASE_URL}${TOKEN_REFRESH_PATH}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh: refreshToken.value })
     });
-    if (!response.ok) { console.error("Refresh token failed:", response.status); return null; }
+    if (!response.ok) return null;
     const data = await response.json();
     if (data.access) {
       accessToken.value = data.access; localStorage.setItem('accessToken', data.access);
       if (data.refresh) { refreshToken.value = data.refresh; localStorage.setItem('refreshToken', data.refresh); }
-      console.log("Access token refreshed.");
       return data;
     }
     return null;
-  } catch (error) { console.error("Error refreshing access token:", error); return null; }
+  } catch { return null; }
 };
 
 const loadFilterOptions = async () => {
     globalLoading.value = true; globalError.value = null;
-    console.log("App.vue: Attempting to load filter options. IsAuthenticated:", isAuthenticated.value);
     try {
         const groupsData = await fetchData(`${API_BASE_URL}/groups/`);
         if (groupsData) { 
             filterOptions.groups = groupsData.map(g => g.name || g.title).filter(Boolean).sort(); 
         }
-        else { console.warn("No group data received from /api/groups/ or error occurred."); filterOptions.groups = []; }
+        else { filterOptions.groups = []; }
 
         const subjectsData = await fetchData(`${API_BASE_URL}/disciplines/`);
         if (subjectsData) { 
@@ -349,11 +337,9 @@ const loadFilterOptions = async () => {
                 filterOptions.subjects = [];
             }
         }
-        else { console.warn("No subject data received from /api/disciplines/ or error occurred."); filterOptions.subjects = [];}
+        else { filterOptions.subjects = []; }
 
-        console.log("App.vue: Filter options loaded (or attempted). Groups:", filterOptions.groups.length, "Subjects:", filterOptions.subjects.length);
     } catch (e) {
-        console.error("App.vue: Error loading filter options:", e);
         globalError.value = `Не удалось загрузить опции для фильтров: ${e.message}`;
         if (e.message.toLowerCase().includes("авторизац") && !isAuthenticated.value) {
           setTimeout(() => { openLoginModal(); }, 200);
@@ -395,9 +381,7 @@ onMounted(() => {
     try {
       userData.value = JSON.parse(savedUserDataString);
       isAuthenticated.value = true; 
-      console.log("Auth data restored. User:", userData.value.name || userData.value.email);
     } catch (e) {
-      console.error("Error parsing saved user data from localStorage", e);
       logout(); 
     }
   }
