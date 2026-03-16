@@ -1,11 +1,18 @@
 <template>
   <div>
     <!-- Header в стиле ИРНИТУ -->
-    <header class="istu-header fixed-top">
+    <header class="istu-header fixed-top" role="navigation">
       <div class="istu-toolbar">
         <!-- Мобильная кнопка меню - показывать пока не xxl (1400px) -->
         <div class="mobile-menu-toggle mobile-menu-toggle-custom">
-          <button class="btn btn-link text-dark" @click="toggleMobileMenu">
+          <button
+            class="btn btn-link text-dark"
+            type="button"
+            @click="toggleMobileMenu"
+            :aria-expanded="mobileMenuOpen"
+            aria-label="Открыть главное меню"
+            aria-controls="mobileMainMenu"
+          >
             <i class="material-icons">menu</i>
           </button>
         </div>
@@ -64,7 +71,11 @@
       </div>
       
       <!-- Мобильное меню - показывать пока не xxl (1400px) -->
-      <div class="mobile-menu mobile-menu-toggle-custom" :class="{ 'mobile-menu-open': mobileMenuOpen }">
+      <div
+        id="mobileMainMenu"
+        class="mobile-menu mobile-menu-toggle-custom"
+        :class="{ 'mobile-menu-open': mobileMenuOpen }"
+      >
         <a class="mobile-menu-item" :class="{ active: activeTab === 'statistics' }" @click="setActiveTabMobile('statistics')">
           <i class="material-icons">analytics</i> СТАТИСТИКА ОЦЕНОК
         </a>
@@ -411,11 +422,11 @@ body {
 .istu-header { 
   background-color: #fff;
   color: #000; 
-  height: 50px; 
+  height: 56px; 
   border-bottom: 1px solid #e0e0e0; 
   box-shadow: 0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px 0 rgba(0,0,0,.14), 0 1px 10px 0 rgba(0,0,0,.12);
   z-index: 1030;
-  padding: 0 8px; 
+  padding: 0 12px; 
 }
 
 .istu-toolbar {
@@ -485,18 +496,24 @@ body {
   display: flex;
   align-items: stretch; 
   height: 100%;
-  margin-left: 16px; 
-  max-width: 50%;
-  overflow: hidden;
-  justify-content: flex-start; 
+  margin-left: 16px;
+  gap: 4px;
+  max-width: 60%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  justify-content: flex-start;
   min-width: 0;
   display: none; /* по умолчанию скрыты */
+}
+.istu-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .istu-tab {
   display: flex;
   align-items: center;
-  padding: 0 12px; 
+  padding: 0 14px;
   color: rgba(0,0,0,0.7);
   text-decoration: none;
   position: relative;
@@ -602,7 +619,7 @@ body {
 
 .mobile-menu {
   position: fixed;
-  top: 50px; 
+  top: 56px; 
   left: 0;
   width: 100%;
   background-color: white;
@@ -610,11 +627,16 @@ body {
   z-index: 1100 !important;
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.3s ease-out;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: max-height 0.25s ease-out, opacity 0.2s ease-out, transform 0.2s ease-out;
 }
 .mobile-menu-open {
   max-height: calc(100vh - 50px); 
+  max-height: calc(100vh - 56px);
   overflow-y: auto;
+  opacity: 1;
+  transform: translateY(0);
   border-top: 1px solid #e0e0e0;
 }
 .mobile-menu-item {
@@ -634,7 +656,7 @@ body {
   margin-right: 12px;
 }
 /* ГЛАВНОЕ ПРАВИЛО: 1600px переключение */
-@media (max-width: 1599.98px) {
+@media (max-width: 1199.98px) {
   .istu-tabs {
     display: none !important;
   }
@@ -664,7 +686,7 @@ body {
   }
 }
 
-@media (min-width: 1600px) {
+@media (min-width: 1200px) {
   .istu-tabs {
     display: flex !important;
   }
