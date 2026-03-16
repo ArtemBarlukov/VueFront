@@ -180,6 +180,119 @@
                 </div>
               </div>
             </div>
+
+            <!-- Аналитика по группам -->
+            <div v-if="groupAnalyticsLoaded" class="row mt-4">
+              <div class="col">
+                <div class="card">
+                  <div class="card-header d-flex justify-content-between align-items-center" style="cursor: pointer" @click="groupAnalyticsExpanded = !groupAnalyticsExpanded">
+                    <h6 class="mb-0">
+                      <i class="material-icons small align-middle me-1">insights</i>
+                      Аналитика по группам
+                    </h6>
+                    <i class="material-icons">{{ groupAnalyticsExpanded ? 'expand_less' : 'expand_more' }}</i>
+                  </div>
+                  <div v-if="groupAnalyticsExpanded" class="card-body">
+                    <div v-if="USE_MOCK_ANALYTICS" class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center small">
+                      <i class="material-icons small me-2">science</i>
+                      <span><strong>Демо-режим:</strong> данные групп сгенерированы случайно для демонстрации. Реальные данные появятся после подключения модуля аналитики.</span>
+                    </div>
+
+                    <!-- Сводные карточки -->
+                    <div class="row mb-3 g-2">
+                      <div class="col-md-3 col-6">
+                        <div class="card border-0 shadow-sm h-100 text-center">
+                          <div class="card-body py-2 px-2">
+                            <div class="text-muted small">Всего групп</div>
+                            <div class="fw-bold fs-5">{{ groupFullData.length }}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-3 col-6">
+                        <div class="card border-0 shadow-sm h-100 text-center border-start border-success border-3">
+                          <div class="card-body py-2 px-2">
+                            <div class="text-success small">Лучшая группа</div>
+                            <div class="fw-bold fs-6 text-success">{{ bestGroup?.group || '—' }}</div>
+                            <div class="text-muted" style="font-size: 0.7rem">{{ bestGroup ? bestGroup.avgGrade.toFixed(2) + ' ср. балл' : '' }}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-3 col-6">
+                        <div class="card border-0 shadow-sm h-100 text-center border-start border-danger border-3">
+                          <div class="card-body py-2 px-2">
+                            <div class="text-danger small">Требуют внимания</div>
+                            <div class="fw-bold fs-5 text-danger">{{ groupsAtRiskCount }}</div>
+                            <div class="text-muted" style="font-size: 0.7rem">ср. балл &lt; 3.5 или посещ. &lt; 60%</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-3 col-6">
+                        <div class="card border-0 shadow-sm h-100 text-center border-start border-primary border-3">
+                          <div class="card-body py-2 px-2">
+                            <div class="text-primary small">Средний балл (все)</div>
+                            <div class="fw-bold fs-5 text-primary">{{ overallAvgGrade }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Текстовые инсайты -->
+                    <div v-if="groupInsights.length" class="mb-3">
+                      <div v-for="(insight, i) in groupInsights" :key="i" class="d-flex align-items-start mb-1">
+                        <i class="material-icons small me-1" :class="insight.color" style="margin-top: 2px">{{ insight.icon }}</i>
+                        <span class="small" v-html="insight.text"></span>
+                      </div>
+                    </div>
+
+                    <!-- Единая таблица групп -->
+                    <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                      <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light sticky-top">
+                          <tr>
+                            <th style="width: 40px">#</th>
+                            <th>Группа</th>
+                            <th style="width: 80px">Студ.</th>
+                            <th style="min-width: 180px">Ср. балл</th>
+                            <th style="min-width: 180px">Посещаемость</th>
+                            <th style="width: 90px" class="text-center">Статус</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(g, i) in sortedGroupFull" :key="g.group" :class="{'table-danger-subtle': g.atRisk}">
+                            <td class="text-muted">{{ i + 1 }}</td>
+                            <td class="fw-semibold">{{ g.group }}</td>
+                            <td>{{ g.studentsCount }}</td>
+                            <td>
+                              <div class="d-flex align-items-center gap-2">
+                                <div class="progress flex-grow-1" style="height: 8px">
+                                  <div class="progress-bar" :class="gradeBarClass(g.avgGrade)" :style="{ width: (g.avgGrade / 5 * 100) + '%' }" role="progressbar"></div>
+                                </div>
+                                <span class="badge" :class="gradeBarClass(g.avgGrade)" style="min-width: 44px">{{ g.avgGrade.toFixed(2) }}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <div class="d-flex align-items-center gap-2">
+                                <div class="progress flex-grow-1" style="height: 8px">
+                                  <div class="progress-bar" :class="attendanceBarClass(g.attendancePercent)" :style="{ width: g.attendancePercent + '%' }" role="progressbar"></div>
+                                </div>
+                                <span class="small fw-semibold" style="min-width: 44px">{{ g.attendancePercent.toFixed(0) }}%</span>
+                              </div>
+                            </td>
+                            <td class="text-center">
+                              <span v-if="g.atRisk" class="badge bg-danger">Риск</span>
+                              <span v-else-if="g.avgGrade >= 4.5 && g.attendancePercent >= 80" class="badge bg-success">Отлично</span>
+                              <span v-else class="badge bg-secondary bg-opacity-25 text-dark">Норма</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -213,6 +326,12 @@ const API_BASE_URL = inject('API_BASE_URL');
 const statisticsData = ref(null);
 const isLoading = ref(false);
 const error = ref(null);
+
+const USE_MOCK_ANALYTICS = true;
+
+const groupAnalyticsLoaded = ref(false);
+const groupAnalyticsExpanded = ref(USE_MOCK_ANALYTICS);
+const groupFullData = ref([]);
 
 const filters = reactive({
   course: '', semester: '', group: '', subject: '', search: ''
@@ -559,8 +678,142 @@ watch(
   { deep: true, immediate: false }
 );
 
+const MOCK_GROUPS = [
+  'ИСТб-21-1', 'ИСТб-21-2', 'ИСТб-21-3',
+  'ИВТб-21-1', 'ИВТб-21-2',
+  'ПИб-21-1', 'ПИб-21-2',
+  'ИБб-21-1', 'ИБб-21-2',
+];
+
+const generateMockGroupAnalytics = () => {
+  groupFullData.value = MOCK_GROUPS.map(group => {
+    const avgGrade = +(2.8 + Math.random() * 2.2).toFixed(2);
+    const attendancePercent = +(45 + Math.random() * 55).toFixed(1);
+    const studentsCount = Math.floor(15 + Math.random() * 20);
+    return {
+      group,
+      studentsCount,
+      avgGrade,
+      attendancePercent,
+      atRisk: avgGrade < 3.5 || attendancePercent < 60,
+    };
+  });
+  groupAnalyticsLoaded.value = true;
+};
+
+const fetchGroupAnalytics = async () => {
+  if (USE_MOCK_ANALYTICS) {
+    generateMockGroupAnalytics();
+    return;
+  }
+  try {
+    const data = await fetchData(`${API_BASE_URL}/clustering/`);
+    if (data) {
+      const stats = data.groupStats || [];
+      const activity = data.groupActivity || [];
+      const activityMap = Object.fromEntries(activity.map(a => [a.group, a]));
+      groupFullData.value = stats.map(s => {
+        const act = activityMap[s.group] || {};
+        const avgGrade = s.avgGrade ?? 0;
+        const attendancePercent = s.attendancePercent ?? act.avgAttendance ?? 0;
+        return {
+          group: s.group,
+          studentsCount: act.studentsCount ?? 0,
+          avgGrade,
+          attendancePercent,
+          atRisk: avgGrade < 3.5 || attendancePercent < 60,
+        };
+      });
+      groupAnalyticsLoaded.value = true;
+    }
+  } catch {
+    groupAnalyticsLoaded.value = false;
+  }
+};
+
+const sortedGroupFull = computed(() =>
+  [...groupFullData.value].sort((a, b) => (b.avgGrade ?? 0) - (a.avgGrade ?? 0))
+);
+
+const bestGroup = computed(() => sortedGroupFull.value[0] ?? null);
+
+const groupsAtRiskCount = computed(() =>
+  groupFullData.value.filter(g => g.atRisk).length
+);
+
+const overallAvgGrade = computed(() => {
+  if (!groupFullData.value.length) return '—';
+  const sum = groupFullData.value.reduce((acc, g) => acc + g.avgGrade, 0);
+  return (sum / groupFullData.value.length).toFixed(2);
+});
+
+const groupInsights = computed(() => {
+  const insights = [];
+  const sorted = sortedGroupFull.value;
+  if (!sorted.length) return insights;
+
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+  const riskGroups = groupFullData.value.filter(g => g.atRisk);
+  const excellentGroups = groupFullData.value.filter(g => g.avgGrade >= 4.5 && g.attendancePercent >= 80);
+
+  insights.push({
+    icon: 'emoji_events',
+    color: 'text-success',
+    text: `<strong>${best.group}</strong> лидирует с баллом <strong>${best.avgGrade.toFixed(2)}</strong> и посещаемостью <strong>${best.attendancePercent.toFixed(0)}%</strong>`,
+  });
+
+  if (worst.group !== best.group && worst.avgGrade < 3.5) {
+    insights.push({
+      icon: 'warning',
+      color: 'text-danger',
+      text: `<strong>${worst.group}</strong> — самый низкий средний балл (<strong>${worst.avgGrade.toFixed(2)}</strong>), стоит обратить внимание`,
+    });
+  }
+
+  if (riskGroups.length > 0) {
+    insights.push({
+      icon: 'error_outline',
+      color: 'text-danger',
+      text: `<strong>${riskGroups.length}</strong> из ${sorted.length} групп ниже порога (балл &lt; 3.5 или посещ. &lt; 60%)`,
+    });
+  }
+
+  if (excellentGroups.length > 0) {
+    insights.push({
+      icon: 'star',
+      color: 'text-success',
+      text: `<strong>${excellentGroups.length}</strong> ${excellentGroups.length === 1 ? 'группа показывает' : 'групп показывают'} отличный результат (балл ≥ 4.5 и посещ. ≥ 80%)`,
+    });
+  }
+
+  const bestAttGroup = [...groupFullData.value].sort((a, b) => b.attendancePercent - a.attendancePercent)[0];
+  if (bestAttGroup && bestAttGroup.group !== best.group) {
+    insights.push({
+      icon: 'directions_run',
+      color: 'text-primary',
+      text: `Лучшая посещаемость у <strong>${bestAttGroup.group}</strong> — <strong>${bestAttGroup.attendancePercent.toFixed(0)}%</strong>`,
+    });
+  }
+
+  return insights;
+});
+
+const gradeBarClass = (grade) => {
+  if (grade >= 4.5) return 'bg-success';
+  if (grade >= 3.5) return 'bg-warning';
+  return 'bg-danger';
+};
+
+const attendanceBarClass = (pct) => {
+  if (pct >= 80) return 'bg-success';
+  if (pct >= 60) return 'bg-warning';
+  return 'bg-danger';
+};
+
 onMounted(() => {
   fetchStatisticsMarks();
+  fetchGroupAnalytics();
 });
 
 const processStudentData = (students) => {
@@ -636,5 +889,8 @@ const processStudentData = (students) => {
 <style scoped>
 .d-flex.gap-2 {
     flex-wrap: wrap;
+}
+.table-danger-subtle {
+    background-color: rgba(220, 53, 69, 0.05);
 }
 </style>

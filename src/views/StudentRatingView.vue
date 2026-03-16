@@ -2,6 +2,55 @@
   <div class="student-rating-section">
     <div v-if="isLoading" class="alert alert-info">Загрузка рейтинга студентов...</div>
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
+
+    <!-- Аналитические инсайты -->
+    <div v-if="analyticsLoaded && USE_MOCK_ANALYTICS" class="alert alert-warning py-2 px-3 mb-2 d-flex align-items-center small">
+      <i class="material-icons small me-2">science</i>
+      <span><strong>Демо-режим:</strong> статусы студентов сгенерированы случайно для демонстрации. Реальные данные появятся после подключения модуля аналитики.</span>
+    </div>
+    <div v-if="analyticsLoaded" class="row mb-3 g-2">
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm h-100" :class="{ 'ring-active': !statusFilter }" style="cursor:pointer" @click="setStatusFilter('')">
+          <div class="card-body py-2 px-3 text-center">
+            <i class="material-icons text-muted mb-1" style="font-size: 1.3rem">people</i>
+            <div class="text-muted small">Проанализировано</div>
+            <div class="fw-bold fs-5">{{ analyticsSummary.total }}</div>
+            <div class="text-muted" style="font-size: 0.7rem">студентов</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm h-100 border-start border-success border-3" :class="{ 'ring-active': statusFilter === 'excellent' }" style="cursor:pointer" @click="setStatusFilter('excellent')">
+          <div class="card-body py-2 px-3 text-center">
+            <i class="material-icons text-success mb-1" style="font-size: 1.3rem">emoji_events</i>
+            <div class="text-success small">Активные отличники</div>
+            <div class="fw-bold fs-5 text-success">{{ analyticsSummary.topCount }}</div>
+            <div class="text-muted" style="font-size: 0.7rem">{{ analyticsSummary.topPercent }}% от общего</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm h-100 border-start border-danger border-3" :class="{ 'ring-active': statusFilter === 'risk' }" style="cursor:pointer" @click="setStatusFilter('risk')">
+          <div class="card-body py-2 px-3 text-center">
+            <i class="material-icons text-danger mb-1" style="font-size: 1.3rem">warning</i>
+            <div class="text-danger small">Зона риска</div>
+            <div class="fw-bold fs-5 text-danger">{{ analyticsSummary.riskCount }}</div>
+            <div class="text-muted" style="font-size: 0.7rem">{{ analyticsSummary.riskPercent }}% от общего</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm h-100 border-start border-info border-3" :class="{ 'ring-active': statusFilter === 'good' }" style="cursor:pointer" @click="setStatusFilter('good')">
+          <div class="card-body py-2 px-3 text-center">
+            <i class="material-icons text-info mb-1" style="font-size: 1.3rem">check_circle</i>
+            <div class="text-info small">Хорошая посещаемость</div>
+            <div class="fw-bold fs-5 text-info">{{ analyticsSummary.goodCount }}</div>
+            <div class="text-muted" style="font-size: 0.7rem">{{ analyticsSummary.goodPercent }}% от общего</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="chartData.length > 0 || allStudentsData.length > 0" class="card">
        <div class="card-header">
          <h5 class="text-center mb-3">Рейтинг студентов</h5>
@@ -26,6 +75,12 @@
                <li><a class="dropdown-item" @click="filters.limit = 20">Топ 20</a></li>
              </ul>
            </div>
+         </div>
+         <div v-if="statusFilter" class="d-flex justify-content-center mb-2">
+           <span class="badge" :class="statusFilterBadgeClass">
+             {{ statusFilterLabel }}
+             <button type="button" class="btn-close btn-close-white ms-2" aria-label="Close" @click="statusFilter = ''" style="font-size: 0.5rem;"></button>
+           </span>
          </div>
        </div>
        <div class="card-body">
@@ -55,10 +110,22 @@
          </div>
          <div class="table-responsive">
            <table class="table table-striped table-hover">
-             <thead><tr><th>ID студента</th><th>Группа</th><th>Курс</th><th>Ср.балл</th><th>Актив.</th><th>Посещ.</th><th>Риск отч.</th><th>Рейтинг</th></tr></thead>
+             <thead><tr><th>ID студента</th><th>Группа</th><th>Курс</th><th>Ср.балл</th><th>Актив.</th><th>Посещ.</th><th>Риск отч.</th><th>Рейтинг</th><th v-if="analyticsLoaded">Статус</th></tr></thead>
              <tbody>
-              <tr v-for="(student, index) in paginatedStudents" :key="`${student.id}-${index}`"><td>{{ student.id || student.name || 'N/A' }}</td><td>{{ student.group }}</td><td>{{ student.course }}</td><td>{{ student.avgGrade?.toFixed(2) ?? 'N/A' }}</td><td>{{ student.activity?.toFixed(0) ?? 'N/A' }}</td><td>{{ formatRatingAttendance(student.attendancePercent) }}</td><td><span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span></td><td>{{ student.rating?.toFixed(2) ?? 'N/A' }}</td></tr>
-              <tr v-if="!paginatedStudents.length"><td colspan="8" class="text-center text-muted">Студенты не найдены</td></tr>
+              <tr v-for="(student, index) in paginatedStudents" :key="`${student.id}-${index}`">
+                <td>{{ student.id || student.name || 'N/A' }}</td>
+                <td>{{ student.group }}</td>
+                <td>{{ student.course }}</td>
+                <td>{{ student.avgGrade?.toFixed(2) ?? 'N/A' }}</td>
+                <td>{{ student.activity?.toFixed(0) ?? 'N/A' }}</td>
+                <td>{{ formatRatingAttendance(student.attendancePercent) }}</td>
+                <td><span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span></td>
+                <td>{{ student.rating?.toFixed(2) ?? 'N/A' }}</td>
+                <td v-if="analyticsLoaded">
+                  <span v-if="getStudentStatus(student.id)" class="badge" :class="getStudentStatusClass(student.id)">{{ getStudentStatus(student.id) }}</span>
+                </td>
+              </tr>
+              <tr v-if="!paginatedStudents.length"><td :colspan="analyticsLoaded ? 9 : 8" class="text-center text-muted">Студенты не найдены</td></tr>
              </tbody>
            </table>
          </div>
@@ -103,14 +170,118 @@ const filters = reactive({
   course: '', group: '', subject: '', sortBy: 'rating', limit: 5
 });
 
-
 const currentPage = ref(1);
 const itemsPerPage = ref(25); 
-
 
 const chartData = ref([]); 
 const allStudentsData = ref([]); 
 
+const USE_MOCK_ANALYTICS = true;
+
+const analyticsData = ref(null);
+const analyticsLoaded = ref(false);
+const statusFilter = ref('');
+
+const topStudentIds = ref(new Set());
+const lowAttendanceIds = ref(new Set());
+const goodAttendanceIds = ref(new Set());
+
+const applyAnalyticsData = (data) => {
+  analyticsData.value = data;
+  analyticsLoaded.value = true;
+  topStudentIds.value = new Set((data.topStudents || []).map(s => String(s.id)));
+  lowAttendanceIds.value = new Set((data.lowAttendance || []).map(s => String(s.id)));
+  goodAttendanceIds.value = new Set((data.goodAttendance || []).map(s => String(s.id)));
+};
+
+const generateMockAnalytics = () => {
+  const students = allStudentsData.value;
+  if (!students || students.length === 0) return;
+
+  const ids = students.map(s => String(s.id));
+  const shuffled = [...ids].sort(() => Math.random() - 0.5);
+
+  const topCount = Math.max(1, Math.floor(ids.length * 0.08));
+  const riskCount = Math.max(1, Math.floor(ids.length * 0.12));
+  const goodCount = Math.max(1, Math.floor(ids.length * 0.20));
+
+  let offset = 0;
+  const topIds = shuffled.slice(offset, offset + topCount);
+  offset += topCount;
+  const riskIds = shuffled.slice(offset, offset + riskCount);
+  offset += riskCount;
+  const goodIds = shuffled.slice(offset, offset + goodCount);
+
+  applyAnalyticsData({
+    summary: { totalStudents: ids.length },
+    topStudents: topIds.map(id => ({ id })),
+    lowAttendance: riskIds.map(id => ({ id })),
+    goodAttendance: goodIds.map(id => ({ id })),
+  });
+};
+
+const fetchAnalytics = async () => {
+  if (USE_MOCK_ANALYTICS) return;
+  try {
+    const data = await fetchData(`${API_BASE_URL}/clustering/`);
+    if (data) applyAnalyticsData(data);
+  } catch {
+    analyticsLoaded.value = false;
+  }
+};
+
+const analyticsSummary = computed(() => {
+  const total = analyticsData.value?.summary?.totalStudents ?? analyticsData.value?.students?.length ?? 0;
+  const topCount = analyticsData.value?.topStudents?.length ?? 0;
+  const riskCount = analyticsData.value?.lowAttendance?.length ?? 0;
+  const goodCount = analyticsData.value?.goodAttendance?.length ?? 0;
+  const pct = (n) => total > 0 ? ((n / total) * 100).toFixed(1) : '0.0';
+  return {
+    total, topCount, riskCount, goodCount,
+    topPercent: pct(topCount),
+    riskPercent: pct(riskCount),
+    goodPercent: pct(goodCount),
+  };
+});
+
+const getStudentStatus = (studentId) => {
+  const id = String(studentId);
+  if (topStudentIds.value.has(id)) return 'Отличник';
+  if (lowAttendanceIds.value.has(id)) return 'Зона риска';
+  if (goodAttendanceIds.value.has(id)) return 'Хор. посещ.';
+  return '';
+};
+
+const getStudentStatusClass = (studentId) => {
+  const id = String(studentId);
+  if (topStudentIds.value.has(id)) return 'bg-success';
+  if (lowAttendanceIds.value.has(id)) return 'bg-danger';
+  if (goodAttendanceIds.value.has(id)) return 'bg-info';
+  return 'bg-secondary';
+};
+
+const setStatusFilter = (status) => {
+  statusFilter.value = statusFilter.value === status ? '' : status;
+  currentPage.value = 1;
+};
+
+const statusFilterLabel = computed(() => {
+  switch (statusFilter.value) {
+    case 'excellent': return 'Активные отличники';
+    case 'risk': return 'Зона риска';
+    case 'good': return 'Хорошая посещаемость';
+    default: return '';
+  }
+});
+
+const statusFilterBadgeClass = computed(() => {
+  switch (statusFilter.value) {
+    case 'excellent': return 'bg-success';
+    case 'risk': return 'bg-danger';
+    case 'good': return 'bg-info';
+    default: return 'bg-secondary';
+  }
+});
 
 const fetchStudentRating = async () => {
     isLoading.value = true;
@@ -142,6 +313,8 @@ const fetchStudentRating = async () => {
                 students: allStudentsData.value 
             };
         }
+
+        if (USE_MOCK_ANALYTICS) generateMockAnalytics();
     } catch (err) {
         error.value = err.message || 'Не удалось загрузить данные рейтинга.';
         chartData.value = [];
@@ -216,17 +389,30 @@ const ratingChartData = computed(() => {
 
 const filteredStudents = computed(() => {
     if (!allStudentsData.value) return [];
-    
+    let result = allStudentsData.value;
+
     if (filters.search && filters.search.trim() !== '') {
         const searchTerm = filters.search.toLowerCase().trim();
-        return allStudentsData.value.filter(student => {
+        result = result.filter(student => {
             const studentId = String(student.id || student.name || '');
             return studentId.toLowerCase().includes(searchTerm) ||
                    (student.group && student.group.toLowerCase().includes(searchTerm));
         });
     }
-    
-    return allStudentsData.value;
+
+    if (statusFilter.value && analyticsLoaded.value) {
+        result = result.filter(student => {
+            const id = String(student.id);
+            switch (statusFilter.value) {
+                case 'excellent': return topStudentIds.value.has(id);
+                case 'risk': return lowAttendanceIds.value.has(id);
+                case 'good': return goodAttendanceIds.value.has(id);
+                default: return true;
+            }
+        });
+    }
+
+    return result;
 });
 
 const totalStudents = computed(() => allStudentsData.value?.length ?? 0);
@@ -254,11 +440,18 @@ watch(filters, fetchStudentRating, { deep: true, immediate: false });
 
 onMounted(() => {
   fetchStudentRating();
+  fetchAnalytics();
 });
 </script>
 
 <style scoped>
 .d-flex.gap-3 {
     flex-wrap: wrap;
+}
+.ring-active {
+    box-shadow: 0 0 0 2px var(--bs-primary) !important;
+}
+.table-danger-subtle {
+    background-color: rgba(220, 53, 69, 0.05);
 }
 </style>
