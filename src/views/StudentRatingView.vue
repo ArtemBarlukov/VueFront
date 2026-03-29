@@ -4,10 +4,6 @@
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
 
     <!-- Аналитические инсайты -->
-    <div v-if="analyticsLoaded && USE_MOCK_ANALYTICS" class="alert alert-warning py-2 px-3 mb-2 d-flex align-items-center small">
-      <i class="material-icons small me-2">science</i>
-      <span><strong>Демо-режим:</strong> статусы студентов сгенерированы случайно для демонстрации. Реальные данные появятся после подключения модуля аналитики.</span>
-    </div>
     <div v-if="analyticsLoaded" class="row mb-3 g-2">
       <div class="col-md-3 col-6">
         <div class="card border-0 shadow-sm h-100" :class="{ 'ring-active': !statusFilter }" style="cursor:pointer" @click="setStatusFilter('')">
@@ -61,8 +57,8 @@
            <button class="btn btn-outline-secondary btn-sm" @click="resetFilters">Сбросить</button>
            <div class="btn-group">
              <input type="radio" class="btn-check" name="rs" id="sr" v-model="filters.sortBy" value="rating"><label class="btn btn-outline-primary btn-sm" for="sr">Рейтинг</label>
-             <input type="radio" class="btn-check" name="rs" id="sp" v-model="filters.sortBy" value="avgGrade"><label class="btn btn-outline-primary btn-sm" for="sp">Успев.</label>
-             <input type="radio" class="btn-check" name="rs" id="sa" v-model="filters.sortBy" value="attendancePercent"><label class="btn btn-outline-primary btn-sm" for="sa">Посещ.</label>
+             <input type="radio" class="btn-check" name="rs" id="sp" v-model="filters.sortBy" value="performance"><label class="btn btn-outline-primary btn-sm" for="sp">Успев.</label>
+             <input type="radio" class="btn-check" name="rs" id="sa" v-model="filters.sortBy" value="attendance"><label class="btn btn-outline-primary btn-sm" for="sa">Посещ.</label>
              <input type="radio" class="btn-check" name="rs" id="sac" v-model="filters.sortBy" value="activity"><label class="btn btn-outline-primary btn-sm" for="sac">Актив.</label>
            </div>
            <div class="dropdown">
@@ -110,22 +106,31 @@
          </div>
          <div class="table-responsive">
            <table class="table table-striped table-hover">
-             <thead><tr><th>ID студента</th><th>Группа</th><th>Курс</th><th>Ср.балл</th><th>Актив.</th><th>Посещ.</th><th>Риск отч.</th><th>Рейтинг</th><th v-if="analyticsLoaded">Статус</th></tr></thead>
+             <thead><tr><th>ID студента</th><th>Группа</th><th>Курс</th><th>Ср.балл</th><th>Актив.</th><th>Посещ.</th><th>Долги</th><th>Риск отч.</th><th>Рейтинг</th><th v-if="analyticsLoaded">Статус</th></tr></thead>
              <tbody>
-              <tr v-for="(student, index) in paginatedStudents" :key="`${student.id}-${index}`">
+              <tr v-for="(student, index) in paginatedStudents" :key="`${student.id}-${index}`" :class="{'table-danger-subtle': student.riskLevel === 'высокий'}">
                 <td>{{ student.id || student.name || 'N/A' }}</td>
                 <td>{{ student.group }}</td>
                 <td>{{ student.course }}</td>
                 <td>{{ student.avgGrade?.toFixed(2) ?? 'N/A' }}</td>
-                <td>{{ student.activity?.toFixed(0) ?? 'N/A' }}</td>
+                <td>{{ student.activity?.toFixed(2) ?? 'N/A' }}</td>
                 <td>{{ formatRatingAttendance(student.attendancePercent) }}</td>
-                <td><span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span></td>
+                <td>
+                  <span v-if="student.debtCount > 0" class="badge bg-danger" :title="formatDebtsTooltip(student.debtsDetails)" style="cursor: help">
+                    {{ student.debtCount }}
+                  </span>
+                  <span v-else class="badge bg-success">0</span>
+                </td>
+                <td>
+                  <span :class="getDropoutRiskClass(student.dropoutRisk)">{{ formatDropoutRisk(student.dropoutRisk) }}</span>
+                  <div class="small text-muted" v-if="student.riskLevel">{{ student.riskLevel }}</div>
+                </td>
                 <td>{{ student.rating?.toFixed(2) ?? 'N/A' }}</td>
                 <td v-if="analyticsLoaded">
                   <span v-if="getStudentStatus(student.id)" class="badge" :class="getStudentStatusClass(student.id)">{{ getStudentStatus(student.id) }}</span>
                 </td>
               </tr>
-              <tr v-if="!paginatedStudents.length"><td :colspan="analyticsLoaded ? 9 : 8" class="text-center text-muted">Студенты не найдены</td></tr>
+              <tr v-if="!paginatedStudents.length"><td :colspan="analyticsLoaded ? 10 : 9" class="text-center text-muted">Студенты не найдены</td></tr>
              </tbody>
            </table>
          </div>
@@ -140,6 +145,10 @@
          <div class="text-center text-muted mt-2">
            Показано {{ paginatedStudents.length }} из {{ totalStudents }} записей
          </div>
+        <div v-if="isLoadingMore || totalAvailable > loadedStudentsCount" class="text-center text-muted small mt-1">
+          <span v-if="isLoadingMore" class="spinner-border spinner-border-sm me-2" role="status"></span>
+          Догрузка студентов: {{ loadedStudentsCount }} из {{ totalAvailable || '...' }}
+        </div>
        </div>
      </div>
     <div v-else-if="!isLoading && !error && !(chartData.length > 0 || allStudentsData.length > 0)">
@@ -164,6 +173,7 @@ const API_BASE_URL = inject('API_BASE_URL');
 
 const studentRatingData = ref(null);
 const isLoading = ref(false);
+const isLoadingMore = ref(false);
 const error = ref(null);
 
 const filters = reactive({
@@ -173,61 +183,68 @@ const filters = reactive({
 const currentPage = ref(1);
 const itemsPerPage = ref(25); 
 
-const chartData = ref([]); 
-const allStudentsData = ref([]); 
+const allChartEntries = ref([]);
+const allStudentsData = ref([]);
+const totalAvailable = ref(0);
+const loadedStudentsCount = computed(() => allStudentsData.value.length);
 
-const USE_MOCK_ANALYTICS = true;
+const chartData = computed(() => allChartEntries.value.slice(0, filters.limit)); 
 
 const analyticsData = ref(null);
 const analyticsLoaded = ref(false);
 const statusFilter = ref('');
+let activeLoadToken = 0;
 
 const topStudentIds = ref(new Set());
-const lowAttendanceIds = ref(new Set());
+const riskStudentIds = ref(new Set());
 const goodAttendanceIds = ref(new Set());
 
-const applyAnalyticsData = (data) => {
-  analyticsData.value = data;
-  analyticsLoaded.value = true;
-  topStudentIds.value = new Set((data.topStudents || []).map(s => String(s.id)));
-  lowAttendanceIds.value = new Set((data.lowAttendance || []).map(s => String(s.id)));
-  goodAttendanceIds.value = new Set((data.goodAttendance || []).map(s => String(s.id)));
-};
-
-const generateMockAnalytics = () => {
+const deriveAnalyticsFromStudents = () => {
   const students = allStudentsData.value;
-  if (!students || students.length === 0) return;
+  if (!students || students.length === 0) {
+    topStudentIds.value = new Set();
+    riskStudentIds.value = new Set();
+    goodAttendanceIds.value = new Set();
+    analyticsData.value = {
+      summary: { totalStudents: 0 },
+      topStudents: [],
+      lowAttendance: [],
+      goodAttendance: [],
+    };
+    analyticsLoaded.value = true;
+    return;
+  }
 
-  const ids = students.map(s => String(s.id));
-  const shuffled = [...ids].sort(() => Math.random() - 0.5);
+  const topIds = [];
+  const riskIds = [];
+  const goodIds = [];
 
-  const topCount = Math.max(1, Math.floor(ids.length * 0.08));
-  const riskCount = Math.max(1, Math.floor(ids.length * 0.12));
-  const goodCount = Math.max(1, Math.floor(ids.length * 0.20));
+  for (const student of students) {
+    const id = String(student.id);
+    const avgGrade = student.avgGrade ?? 0;
+    const riskLevel = student.riskLevel ?? '';
+    const attendancePercent = student.attendancePercent ?? 0;
 
-  let offset = 0;
-  const topIds = shuffled.slice(offset, offset + topCount);
-  offset += topCount;
-  const riskIds = shuffled.slice(offset, offset + riskCount);
-  offset += riskCount;
-  const goodIds = shuffled.slice(offset, offset + goodCount);
+    if (avgGrade >= 4.5 && riskLevel === 'низкий') {
+      topIds.push(id);
+    } else if (riskLevel === 'высокий') {
+      riskIds.push(id);
+    } else if (attendancePercent >= 80 && riskLevel !== 'высокий') {
+      goodIds.push(id);
+    }
+  }
 
-  applyAnalyticsData({
-    summary: { totalStudents: ids.length },
+  topStudentIds.value = new Set(topIds);
+  riskStudentIds.value = new Set(riskIds);
+  goodAttendanceIds.value = new Set(goodIds);
+
+  analyticsData.value = {
+    summary: { totalStudents: students.length },
     topStudents: topIds.map(id => ({ id })),
     lowAttendance: riskIds.map(id => ({ id })),
     goodAttendance: goodIds.map(id => ({ id })),
-  });
-};
-
-const fetchAnalytics = async () => {
-  if (USE_MOCK_ANALYTICS) return;
-  try {
-    const data = await fetchData(`${API_BASE_URL}/clustering/`);
-    if (data) applyAnalyticsData(data);
-  } catch {
-    analyticsLoaded.value = false;
-  }
+  };
+  analyticsLoaded.value = true;
 };
 
 const analyticsSummary = computed(() => {
@@ -247,7 +264,7 @@ const analyticsSummary = computed(() => {
 const getStudentStatus = (studentId) => {
   const id = String(studentId);
   if (topStudentIds.value.has(id)) return 'Отличник';
-  if (lowAttendanceIds.value.has(id)) return 'Зона риска';
+  if (riskStudentIds.value.has(id)) return 'Зона риска';
   if (goodAttendanceIds.value.has(id)) return 'Хор. посещ.';
   return '';
 };
@@ -255,7 +272,7 @@ const getStudentStatus = (studentId) => {
 const getStudentStatusClass = (studentId) => {
   const id = String(studentId);
   if (topStudentIds.value.has(id)) return 'bg-success';
-  if (lowAttendanceIds.value.has(id)) return 'bg-danger';
+  if (riskStudentIds.value.has(id)) return 'bg-danger';
   if (goodAttendanceIds.value.has(id)) return 'bg-info';
   return 'bg-secondary';
 };
@@ -283,45 +300,95 @@ const statusFilterBadgeClass = computed(() => {
   }
 });
 
+const BATCH_SIZE = 200;
+
+const buildBaseParams = () => {
+  const params = new URLSearchParams();
+  if (filters.course) params.append('course', filters.course);
+  if (filters.group) params.append('group', filters.group);
+  if (filters.subject) params.append('subject', filters.subject);
+  if (filters.sortBy) params.append('sortBy', filters.sortBy);
+  return params;
+};
+
+const fetchRatingBatch = async (baseParams, offset, limit) => {
+  const params = new URLSearchParams(baseParams);
+  params.set('offset', String(offset));
+  params.set('limit', String(limit));
+  return fetchData(`${API_BASE_URL}/student-rating/?${params.toString()}`);
+};
+
+const loadRemainingBatches = async (baseParams, token, initialOffset, total) => {
+  let offset = initialOffset;
+  let hasMore = offset < total;
+  isLoadingMore.value = hasMore;
+
+  while (hasMore && token === activeLoadToken) {
+    const response = await fetchRatingBatch(baseParams, offset, BATCH_SIZE);
+    if (token !== activeLoadToken) return;
+
+    const batchStudents = response?.students || [];
+    const batchChart = response?.chartData || [];
+    const pagination = response?.pagination || {};
+
+    allStudentsData.value = [...allStudentsData.value, ...batchStudents];
+    allChartEntries.value = [...allChartEntries.value, ...batchChart];
+    totalAvailable.value = pagination.total ?? totalAvailable.value;
+
+    deriveAnalyticsFromStudents();
+    offset += batchStudents.length;
+    hasMore = Boolean(pagination.hasMore) && batchStudents.length > 0;
+  }
+
+  if (token === activeLoadToken) {
+    isLoadingMore.value = false;
+  }
+};
+
 const fetchStudentRating = async () => {
+    const token = ++activeLoadToken;
     isLoading.value = true;
+    isLoadingMore.value = false;
     error.value = null;
-    const params = new URLSearchParams();
-    
-    if (filters.course) params.append('course', filters.course);
-    if (filters.group) params.append('group', filters.group);
-    if (filters.subject) params.append('subject', filters.subject);
-    if (filters.sortBy) params.append('sortBy', filters.sortBy);
-    
-    params.append('limit', filters.limit);
+    allChartEntries.value = [];
+    allStudentsData.value = [];
+    totalAvailable.value = 0;
+
+    const baseParams = buildBaseParams();
     try {
+        const firstBatch = await fetchRatingBatch(baseParams, 0, BATCH_SIZE);
+        if (token !== activeLoadToken) return;
 
-        const chartResponse = await fetchData(`${API_BASE_URL}/student-rating/?${params.toString()}`);
-        if (chartResponse) {
-            chartData.value = chartResponse.chartData || [];
-            studentRatingData.value = { chartData: chartData.value };
-        }
-
-        const tableParams = new URLSearchParams(params);
-        tableParams.set('limit', '10000');  // Большое число, чтобы получить всех студентов
-        
-        const tableResponse = await fetchData(`${API_BASE_URL}/student-rating/?${tableParams.toString()}`);
-        if (tableResponse) {
-            allStudentsData.value = tableResponse.students || [];
-            studentRatingData.value = { 
-                ...studentRatingData.value,
-                students: allStudentsData.value 
+        if (firstBatch) {
+            allChartEntries.value = firstBatch.chartData || [];
+            allStudentsData.value = firstBatch.students || [];
+            const pagination = firstBatch.pagination || {};
+            totalAvailable.value = pagination.total ?? allStudentsData.value.length;
+            studentRatingData.value = {
+                chartData: chartData.value,
+                students: allStudentsData.value
             };
-        }
+            deriveAnalyticsFromStudents();
 
-        if (USE_MOCK_ANALYTICS) generateMockAnalytics();
+            isLoading.value = false;
+
+            const nextOffset = allStudentsData.value.length;
+            if (pagination.hasMore) {
+              await loadRemainingBatches(baseParams, token, nextOffset, totalAvailable.value);
+            }
+        }
     } catch (err) {
+        if (token !== activeLoadToken) return;
         error.value = err.message || 'Не удалось загрузить данные рейтинга.';
-        chartData.value = [];
+        allChartEntries.value = [];
         allStudentsData.value = [];
+        totalAvailable.value = 0;
         studentRatingData.value = null;
     } finally {
-        isLoading.value = false;
+        if (token === activeLoadToken) {
+          isLoading.value = false;
+          isLoadingMore.value = false;
+        }
     }
 };
 
@@ -331,12 +398,18 @@ const resetFilters = () => {
   filters.subject = '';
   filters.sortBy = 'rating';
   filters.limit = 5;
+  statusFilter.value = '';
   fetchStudentRating();
 };
 
 const formatRatingAttendance = (p) => (typeof p === 'number' ? `${p.toFixed(1)}%` : 'N/A');
 const formatDropoutRisk = (r) => (typeof r === 'number' ? `${(r * 100).toFixed(1)}%` : 'N/A');
 const getDropoutRiskClass = (r) => { if (typeof r !== 'number') return {'badge': true, 'bg-secondary': true }; const normR = Math.max(0, Math.min(1, r)); return {'badge': true,'bg-success': normR < 0.3,'bg-warning': normR >= 0.3 && normR < 0.6,'bg-danger': normR >= 0.6 }; };
+
+const formatDebtsTooltip = (debtsDetails) => {
+  if (!debtsDetails || !Array.isArray(debtsDetails) || debtsDetails.length === 0) return '';
+  return debtsDetails.map(d => `${d.discipline}: ${d.grade}`).join('\n');
+};
 
 const emptyChartData = (type = 'bar') => ({ type, data: { labels: [], datasets: [] } });
 
@@ -405,7 +478,7 @@ const filteredStudents = computed(() => {
             const id = String(student.id);
             switch (statusFilter.value) {
                 case 'excellent': return topStudentIds.value.has(id);
-                case 'risk': return lowAttendanceIds.value.has(id);
+                case 'risk': return riskStudentIds.value.has(id);
                 case 'good': return goodAttendanceIds.value.has(id);
                 default: return true;
             }
@@ -415,7 +488,7 @@ const filteredStudents = computed(() => {
     return result;
 });
 
-const totalStudents = computed(() => allStudentsData.value?.length ?? 0);
+const totalStudents = computed(() => filteredStudents.value?.length ?? 0);
 
 const totalPages = computed(() => {
   return Math.ceil(totalStudents.value / itemsPerPage.value) || 1;
@@ -436,11 +509,14 @@ const resetPagination = () => {
   currentPage.value = 1;
 };
 
-watch(filters, fetchStudentRating, { deep: true, immediate: false });
+watch(
+  () => ({ course: filters.course, group: filters.group, subject: filters.subject, sortBy: filters.sortBy }),
+  fetchStudentRating,
+  { deep: true, immediate: false }
+);
 
 onMounted(() => {
   fetchStudentRating();
-  fetchAnalytics();
 });
 </script>
 

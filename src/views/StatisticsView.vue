@@ -182,7 +182,7 @@
             </div>
 
             <!-- Аналитика по группам -->
-            <div v-if="groupAnalyticsLoaded" class="row mt-4">
+            <div v-if="groupAnalyticsLoaded || groupAnalyticsLoading" class="row mt-4">
               <div class="col">
                 <div class="card">
                   <div class="card-header d-flex justify-content-between align-items-center" style="cursor: pointer" @click="groupAnalyticsExpanded = !groupAnalyticsExpanded">
@@ -190,14 +190,12 @@
                       <i class="material-icons small align-middle me-1">insights</i>
                       Аналитика по группам
                     </h6>
-                    <i class="material-icons">{{ groupAnalyticsExpanded ? 'expand_less' : 'expand_more' }}</i>
+                    <div class="d-flex align-items-center">
+                      <span v-if="groupAnalyticsLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                      <i class="material-icons">{{ groupAnalyticsExpanded ? 'expand_less' : 'expand_more' }}</i>
+                    </div>
                   </div>
                   <div v-if="groupAnalyticsExpanded" class="card-body">
-                    <div v-if="USE_MOCK_ANALYTICS" class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center small">
-                      <i class="material-icons small me-2">science</i>
-                      <span><strong>Демо-режим:</strong> данные групп сгенерированы случайно для демонстрации. Реальные данные появятся после подключения модуля аналитики.</span>
-                    </div>
-
                     <!-- Сводные карточки -->
                     <div class="row mb-3 g-2">
                       <div class="col-md-3 col-6">
@@ -258,7 +256,16 @@
                           </tr>
                         </thead>
                         <tbody>
-                          <tr v-for="(g, i) in sortedGroupFull" :key="g.group" :class="{'table-danger-subtle': g.atRisk}">
+                          <tr
+                            v-for="(g, i) in sortedGroupFull"
+                            :key="g.group"
+                            :class="{
+                              'table-danger-subtle': g.atRisk,
+                              'table-primary': selectedGroupName === g.group,
+                              'group-row-clickable': true
+                            }"
+                            @click="selectGroup(g.group)"
+                          >
                             <td class="text-muted">{{ i + 1 }}</td>
                             <td class="fw-semibold">{{ g.group }}</td>
                             <td>{{ g.studentsCount }}</td>
@@ -271,11 +278,15 @@
                               </div>
                             </td>
                             <td>
-                              <div class="d-flex align-items-center gap-2">
+                              <div v-if="g.attendancePercent > 0 || !groupAnalyticsLoading" class="d-flex align-items-center gap-2">
                                 <div class="progress flex-grow-1" style="height: 8px">
                                   <div class="progress-bar" :class="attendanceBarClass(g.attendancePercent)" :style="{ width: g.attendancePercent + '%' }" role="progressbar"></div>
                                 </div>
-                                <span class="small fw-semibold" style="min-width: 44px">{{ g.attendancePercent.toFixed(0) }}%</span>
+                                <span class="small fw-semibold" style="min-width: 44px">{{ g.attendancePercent > 0 ? g.attendancePercent.toFixed(0) + '%' : '—' }}</span>
+                              </div>
+                              <div v-else class="d-flex align-items-center gap-2">
+                                <span class="spinner-border spinner-border-sm text-muted" role="status"></span>
+                                <span class="small text-muted">загрузка...</span>
                               </div>
                             </td>
                             <td class="text-center">
@@ -286,6 +297,123 @@
                           </tr>
                         </tbody>
                       </table>
+                    </div>
+
+                    <div v-if="selectedGroupName" class="mt-4 border-top pt-3">
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">
+                          <i class="material-icons small align-middle me-1">groups</i>
+                          Детализация группы {{ selectedGroupName }}
+                        </h6>
+                        <button class="btn btn-sm btn-outline-secondary" @click="selectedGroupName = null">
+                          Скрыть
+                        </button>
+                      </div>
+
+                      <div class="row g-2 mb-3">
+                        <div class="col-md-3 col-6">
+                          <div class="card border-0 shadow-sm h-100 text-center">
+                            <div class="card-body py-2 px-2">
+                              <div class="text-muted small">Студентов в выборке</div>
+                              <div class="fw-bold fs-5">{{ selectedGroupStudents.length }}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                          <div class="card border-0 shadow-sm h-100 text-center border-start border-primary border-3">
+                            <div class="card-body py-2 px-2">
+                              <div class="text-primary small">Ср. балл группы</div>
+                              <div class="fw-bold fs-5 text-primary">{{ selectedGroupAvgGrade }}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                          <div class="card border-0 shadow-sm h-100 text-center border-start border-danger border-3">
+                            <div class="card-body py-2 px-2">
+                              <div class="text-danger small">Рискованные оценки</div>
+                              <div class="fw-bold fs-5 text-danger">{{ selectedGroupFailRate }}%</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                          <div class="card border-0 shadow-sm h-100 text-center border-start border-success border-3">
+                            <div class="card-body py-2 px-2">
+                              <div class="text-success small">Критичных предметов</div>
+                              <div class="fw-bold fs-5 text-success">{{ selectedGroupCriticalSubjects }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="row g-3">
+                        <div class="col-lg-6">
+                          <div class="card h-100">
+                            <div class="card-header">
+                              <h6 class="mb-0">Студенты группы</h6>
+                            </div>
+                            <div class="card-body p-0">
+                              <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                <table class="table table-sm table-hover mb-0">
+                                  <thead class="table-light sticky-top">
+                                    <tr>
+                                      <th>ID</th>
+                                      <th>Ср. балл</th>
+                                      <th>Рисковые оценки</th>
+                                      <th>Статус</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr v-for="student in selectedGroupStudents" :key="student.id">
+                                      <td>{{ student.id }}</td>
+                                      <td>{{ student.avgGrade }}</td>
+                                      <td>{{ student.failCount }} / {{ student.totalGrades }}</td>
+                                      <td>
+                                        <span class="badge" :class="student.risk ? 'bg-danger' : 'bg-success'">
+                                          {{ student.risk ? 'Риск' : 'Норма' }}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="col-lg-6">
+                          <div class="card h-100">
+                            <div class="card-header">
+                              <h6 class="mb-0">Проблемные предметы группы</h6>
+                            </div>
+                            <div class="card-body p-0">
+                              <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                                <table class="table table-sm table-hover mb-0">
+                                  <thead class="table-light sticky-top">
+                                    <tr>
+                                      <th>Предмет</th>
+                                      <th>Ср. балл</th>
+                                      <th>Риск несдачи</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr v-for="subject in selectedGroupSubjectIssues" :key="subject.subject">
+                                      <td>{{ subject.subject }}</td>
+                                      <td>{{ subject.avgGrade }}</td>
+                                      <td>
+                                        <span class="badge" :class="subject.failRate >= 30 ? 'bg-danger' : (subject.failRate >= 15 ? 'bg-warning text-dark' : 'bg-success')">
+                                          {{ subject.failRate }}%
+                                        </span>
+                                      </td>
+                                    </tr>
+                                    <tr v-if="selectedGroupSubjectIssues.length === 0">
+                                      <td colspan="3" class="text-center text-muted">Недостаточно данных</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                   </div>
@@ -327,11 +455,21 @@ const statisticsData = ref(null);
 const isLoading = ref(false);
 const error = ref(null);
 
-const USE_MOCK_ANALYTICS = true;
-
 const groupAnalyticsLoaded = ref(false);
-const groupAnalyticsExpanded = ref(USE_MOCK_ANALYTICS);
+const groupAnalyticsExpanded = ref(false);
 const groupFullData = ref([]);
+const groupAnalyticsLoading = ref(false);
+const selectedGroupName = ref(null);
+
+const parseGradeToNumeric = (grade) => {
+  if (grade === null || grade === undefined) return null;
+  const str = String(grade).toLowerCase();
+  if (str === 'зачет' || str === 'зачёт') return 5;
+  if (str === 'незачет' || str === 'незачёт') return 2;
+  if (str === 'неявка') return 2;
+  const num = parseFloat(str);
+  return isNaN(num) ? null : num;
+};
 
 const filters = reactive({
   course: '', semester: '', group: '', subject: '', search: ''
@@ -361,6 +499,7 @@ const fetchStatisticsMarks = async () => {
             if (data.students && Array.isArray(data.students)) {
                 allStudentsData.value = processStudentData(data.students);
                 sortBy(sortKey.value);
+                buildGroupAnalyticsFromMarks();
             } else {
                 allStudentsData.value = [];
             }
@@ -678,61 +817,219 @@ watch(
   { deep: true, immediate: false }
 );
 
-const MOCK_GROUPS = [
-  'ИСТб-21-1', 'ИСТб-21-2', 'ИСТб-21-3',
-  'ИВТб-21-1', 'ИВТб-21-2',
-  'ПИб-21-1', 'ПИб-21-2',
-  'ИБб-21-1', 'ИБб-21-2',
-];
-
-const generateMockGroupAnalytics = () => {
-  groupFullData.value = MOCK_GROUPS.map(group => {
-    const avgGrade = +(2.8 + Math.random() * 2.2).toFixed(2);
-    const attendancePercent = +(45 + Math.random() * 55).toFixed(1);
-    const studentsCount = Math.floor(15 + Math.random() * 20);
-    return {
-      group,
-      studentsCount,
-      avgGrade,
-      attendancePercent,
-      atRisk: avgGrade < 3.5 || attendancePercent < 60,
-    };
-  });
-  groupAnalyticsLoaded.value = true;
-};
-
-const fetchGroupAnalytics = async () => {
-  if (USE_MOCK_ANALYTICS) {
-    generateMockGroupAnalytics();
+const buildGroupAnalyticsFromMarks = () => {
+  const students = statisticsData.value?.students;
+  if (!students || !Array.isArray(students) || students.length === 0) {
+    groupAnalyticsLoaded.value = false;
     return;
   }
+
+  const groupMap = {};
+
+  for (const student of students) {
+    const groupName = student.group;
+    if (!groupName) continue;
+
+    if (!groupMap[groupName]) {
+      groupMap[groupName] = {
+        group: groupName,
+        grades: [],
+        studentsCount: 0,
+      };
+    }
+
+    groupMap[groupName].studentsCount++;
+
+    if (student.subjects && Array.isArray(student.subjects)) {
+      for (const subj of student.subjects) {
+        if (subj.grades && Array.isArray(subj.grades)) {
+          for (const g of subj.grades) {
+            const num = parseGradeToNumeric(g);
+            if (num !== null && num >= 2 && num <= 5) {
+              groupMap[groupName].grades.push(num);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  groupFullData.value = Object.values(groupMap).map(g => {
+    const avgGrade = g.grades.length > 0
+      ? +(g.grades.reduce((a, b) => a + b, 0) / g.grades.length).toFixed(2)
+      : 0;
+    return {
+      group: g.group,
+      studentsCount: g.studentsCount,
+      avgGrade,
+      attendancePercent: 0,
+      atRisk: avgGrade < 3.5,
+    };
+  });
+
+  if (groupFullData.value.length > 0) {
+    groupAnalyticsLoaded.value = true;
+    groupAnalyticsExpanded.value = true;
+    fetchGroupAttendance();
+  }
+};
+
+const fetchGroupAttendance = async () => {
+  if (!fetchData) return;
+  groupAnalyticsLoading.value = true;
   try {
-    const data = await fetchData(`${API_BASE_URL}/clustering/`);
-    if (data) {
-      const stats = data.groupStats || [];
-      const activity = data.groupActivity || [];
-      const activityMap = Object.fromEntries(activity.map(a => [a.group, a]));
-      groupFullData.value = stats.map(s => {
-        const act = activityMap[s.group] || {};
-        const avgGrade = s.avgGrade ?? 0;
-        const attendancePercent = s.attendancePercent ?? act.avgAttendance ?? 0;
+    const params = new URLSearchParams();
+    params.append('limit', '300');
+    if (filters.course) params.append('course', filters.course);
+
+    const data = await fetchData(`${API_BASE_URL}/student-rating/?${params.toString()}`);
+    if (data && data.students && Array.isArray(data.students)) {
+      const attendanceMap = {};
+
+      for (const student of data.students) {
+        const groupName = student.group;
+        if (!groupName) continue;
+        if (!attendanceMap[groupName]) {
+          attendanceMap[groupName] = [];
+        }
+        if (typeof student.attendancePercent === 'number') {
+          attendanceMap[groupName].push(student.attendancePercent);
+        }
+      }
+
+      groupFullData.value = groupFullData.value.map(g => {
+        const attendances = attendanceMap[g.group];
+        const attendancePercent = attendances && attendances.length > 0
+          ? +(attendances.reduce((a, b) => a + b, 0) / attendances.length).toFixed(1)
+          : 0;
         return {
-          group: s.group,
-          studentsCount: act.studentsCount ?? 0,
-          avgGrade,
+          ...g,
           attendancePercent,
-          atRisk: avgGrade < 3.5 || attendancePercent < 60,
+          atRisk: g.avgGrade < 3.5 || attendancePercent < 60,
         };
       });
-      groupAnalyticsLoaded.value = true;
     }
   } catch {
-    groupAnalyticsLoaded.value = false;
+    // attendance enrichment failed, keep grade-only data
+  } finally {
+    groupAnalyticsLoading.value = false;
   }
 };
 
 const sortedGroupFull = computed(() =>
   [...groupFullData.value].sort((a, b) => (b.avgGrade ?? 0) - (a.avgGrade ?? 0))
+);
+
+const isFailGrade = (grade) => {
+  const str = String(grade).toLowerCase();
+  return str === '2' || str === 'незачет' || str === 'незачёт' || str === 'неявка';
+};
+
+const selectGroup = (groupName) => {
+  selectedGroupName.value = selectedGroupName.value === groupName ? null : groupName;
+};
+
+const selectedGroupStudentsRaw = computed(() => {
+  const all = statisticsData.value?.students;
+  if (!all || !Array.isArray(all) || !selectedGroupName.value) return [];
+  return all.filter(s => s.group === selectedGroupName.value);
+});
+
+const selectedGroupStudents = computed(() => {
+  return selectedGroupStudentsRaw.value.map(student => {
+    let totalGrades = 0;
+    let failCount = 0;
+    const numeric = [];
+
+    for (const subj of student.subjects || []) {
+      for (const grade of subj.grades || []) {
+        totalGrades += 1;
+        if (isFailGrade(grade)) failCount += 1;
+        const n = parseGradeToNumeric(grade);
+        if (n !== null) numeric.push(n);
+      }
+    }
+
+    const avgGrade = numeric.length ? (numeric.reduce((a, b) => a + b, 0) / numeric.length) : 0;
+    const failRate = totalGrades ? (failCount / totalGrades) * 100 : 0;
+
+    return {
+      id: student.id,
+      avgGrade: avgGrade.toFixed(2),
+      failCount,
+      totalGrades,
+      risk: avgGrade < 3.5 || failRate >= 30,
+    };
+  }).sort((a, b) => Number(a.avgGrade) - Number(b.avgGrade));
+});
+
+const selectedGroupNumericGradeStats = computed(() => {
+  const grades = [];
+  for (const student of selectedGroupStudentsRaw.value) {
+    for (const subj of student.subjects || []) {
+      for (const grade of subj.grades || []) {
+        const n = parseGradeToNumeric(grade);
+        if (n !== null && n >= 2 && n <= 5) grades.push(n);
+      }
+    }
+  }
+  return grades;
+});
+
+const selectedGroupAvgGrade = computed(() => {
+  if (!selectedGroupNumericGradeStats.value.length) return '—';
+  const sum = selectedGroupNumericGradeStats.value.reduce((a, b) => a + b, 0);
+  return (sum / selectedGroupNumericGradeStats.value.length).toFixed(2);
+});
+
+const selectedGroupFailRate = computed(() => {
+  let fail = 0;
+  let total = 0;
+  for (const s of selectedGroupStudents.value) {
+    fail += s.failCount;
+    total += s.totalGrades;
+  }
+  if (!total) return 0;
+  return ((fail / total) * 100).toFixed(1);
+});
+
+const selectedGroupSubjectIssues = computed(() => {
+  const subjectMap = {};
+
+  for (const student of selectedGroupStudentsRaw.value) {
+    for (const subj of student.subjects || []) {
+      const subjectName = subj.subject;
+      if (!subjectMap[subjectName]) {
+        subjectMap[subjectName] = { numeric: [], fail: 0, total: 0 };
+      }
+
+      for (const grade of subj.grades || []) {
+        subjectMap[subjectName].total += 1;
+        if (isFailGrade(grade)) subjectMap[subjectName].fail += 1;
+        const n = parseGradeToNumeric(grade);
+        if (n !== null) subjectMap[subjectName].numeric.push(n);
+      }
+    }
+  }
+
+  return Object.entries(subjectMap)
+    .map(([subject, stats]) => {
+      const avgGrade = stats.numeric.length
+        ? (stats.numeric.reduce((a, b) => a + b, 0) / stats.numeric.length)
+        : 0;
+      const failRate = stats.total ? (stats.fail / stats.total) * 100 : 0;
+      return {
+        subject,
+        avgGrade: avgGrade.toFixed(2),
+        failRate: Number(failRate.toFixed(1)),
+      };
+    })
+    .sort((a, b) => b.failRate - a.failRate)
+    .slice(0, 10);
+});
+
+const selectedGroupCriticalSubjects = computed(() =>
+  selectedGroupSubjectIssues.value.filter(s => s.failRate >= 30).length
 );
 
 const bestGroup = computed(() => sortedGroupFull.value[0] ?? null);
@@ -813,7 +1110,6 @@ const attendanceBarClass = (pct) => {
 
 onMounted(() => {
   fetchStatisticsMarks();
-  fetchGroupAnalytics();
 });
 
 const processStudentData = (students) => {
@@ -892,5 +1188,11 @@ const processStudentData = (students) => {
 }
 .table-danger-subtle {
     background-color: rgba(220, 53, 69, 0.05);
+}
+.group-row-clickable {
+    cursor: pointer;
+}
+.group-row-clickable:hover {
+    background-color: rgba(13, 110, 253, 0.06);
 }
 </style>

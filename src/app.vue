@@ -43,6 +43,9 @@
           <a class="istu-tab" :class="{ active: activeTab === 'student-rating' }" @click="setActiveTab('student-rating')" href="#">
             <i class="material-icons">leaderboard</i> РЕЙТИНГ СТУДЕНТОВ
           </a>
+          <a class="istu-tab" :class="{ active: activeTab === 'ml-analytics' }" @click="setActiveTab('ml-analytics')" href="#">
+            <i class="material-icons">psychology</i> ML АНАЛИТИКА
+          </a>
         </div>
         
         <!-- Авторизация (с выпадающим меню для пользователя) - ВСЕГДА ВИДИМА -->
@@ -87,6 +90,9 @@
         </a>
         <a class="mobile-menu-item" :class="{ active: activeTab === 'student-rating' }" @click="setActiveTabMobile('student-rating')">
           <i class="material-icons">leaderboard</i> РЕЙТИНГ СТУДЕНТОВ
+        </a>
+        <a class="mobile-menu-item" :class="{ active: activeTab === 'ml-analytics' }" @click="setActiveTabMobile('ml-analytics')">
+          <i class="material-icons">psychology</i> ML АНАЛИТИКА
         </a>
       </div>
     </header>
@@ -155,6 +161,7 @@ const StatisticsView = defineAsyncComponent(() => import('./views/StatisticsView
 const AcademicLeaveView = defineAsyncComponent(() => import('./views/AcademicLeaveView.vue'));
 const SubjectStatsView = defineAsyncComponent(() => import('./views/SubjectStatsView.vue'));
 const StudentRatingView = defineAsyncComponent(() => import('./views/StudentRatingView.vue'));
+const StudentAnalyticsView = defineAsyncComponent(() => import('./views/StudentAnalyticsView.vue'));
 
 const activeTab = ref('statistics');
 const globalLoading = ref(true);
@@ -366,6 +373,7 @@ const currentViewComponent = computed(() => {
     case 'academic': return AcademicLeaveView;
     case 'subject-stats': return SubjectStatsView;
     case 'student-rating': return StudentRatingView;
+    case 'ml-analytics': return StudentAnalyticsView;
     default: return null;
   }
 });
