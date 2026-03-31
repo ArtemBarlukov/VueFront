@@ -100,8 +100,8 @@ describe('StudentRatingView.vue', () => {
     });
 
     it('обновляет сортировку', () => {
-      wrapper.vm.filters.sortBy = 'avgGrade';
-      expect(wrapper.vm.filters.sortBy).toBe('avgGrade');
+      wrapper.vm.filters.sortBy = 'performance';
+      expect(wrapper.vm.filters.sortBy).toBe('performance');
     });
 
     it('обновляет лимит для графика', () => {
@@ -112,7 +112,7 @@ describe('StudentRatingView.vue', () => {
     it('сбрасывает фильтры', () => {
       wrapper.vm.filters.course = 3;
       wrapper.vm.filters.group = 'ИСТб-21-1';
-      wrapper.vm.filters.sortBy = 'avgGrade';
+      wrapper.vm.filters.sortBy = 'performance';
       wrapper.vm.filters.limit = 10;
       
       wrapper.vm.resetFilters();
@@ -125,42 +125,34 @@ describe('StudentRatingView.vue', () => {
   });
 
   describe('аналитические карточки', () => {
-    it('генерирует моковые аналитические данные', () => {
+    it('вычисляет аналитику по студентам из текущих данных', () => {
       wrapper.vm.allStudentsData = [
-        { id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }
+        { id: '1', avgGrade: 4.6, riskLevel: 'низкий', attendancePercent: 82 },
+        { id: '2', avgGrade: 3.8, riskLevel: 'низкий', attendancePercent: 88 },
+        { id: '3', avgGrade: 4.7, riskLevel: 'низкий', attendancePercent: 75 },
+        { id: '4', avgGrade: 3.1, riskLevel: 'высокий', attendancePercent: 45 },
       ];
-      
-      wrapper.vm.generateMockAnalytics();
-      
+
+      wrapper.vm.deriveAnalyticsFromStudents();
+
       expect(wrapper.vm.analyticsLoaded).toBe(true);
-      // Проверяем, что множества существуют (они могут быть обычными объектами, не ref)
-      expect(wrapper.vm.topStudentIds).toBeDefined();
-      expect(wrapper.vm.lowAttendanceIds).toBeDefined();
-      expect(wrapper.vm.goodAttendanceIds).toBeDefined();
+      expect(wrapper.vm.analyticsSummary.total).toBe(4);
+      expect(wrapper.vm.analyticsSummary.topCount).toBe(2);  // 1 и 3
+      expect(wrapper.vm.analyticsSummary.riskCount).toBe(1); // 4
+      expect(wrapper.vm.analyticsSummary.goodCount).toBe(1); // 2
     });
 
-    it('вычисляет сводную аналитику', () => {
-      wrapper.vm.applyAnalyticsData({
-        summary: { totalStudents: 4 },
-        topStudents: [{ id: '1' }, { id: '3' }],
-        lowAttendance: [{ id: '4' }],
-        goodAttendance: [{ id: '1' }, { id: '2' }, { id: '3' }]
-      });
-      
-      const summary = wrapper.vm.analyticsSummary;
-      expect(summary.total).toBe(4);
-      expect(summary.topCount).toBe(2);
-      expect(summary.riskCount).toBe(1);
-      expect(summary.goodCount).toBe(3);
-    });
+    it('возвращает правильный статус студента после пересчета аналитики', () => {
+      wrapper.vm.allStudentsData = [
+        { id: '1', avgGrade: 4.6, riskLevel: 'низкий', attendancePercent: 82 },
+        { id: '2', avgGrade: 3.8, riskLevel: 'низкий', attendancePercent: 88 },
+        { id: '3', avgGrade: 4.7, riskLevel: 'низкий', attendancePercent: 75 },
+        { id: '4', avgGrade: 3.1, riskLevel: 'высокий', attendancePercent: 45 },
+        { id: '5', avgGrade: 3.2, riskLevel: 'средний', attendancePercent: 60 },
+      ];
 
-    it('возвращает правильный статус студента', () => {
-      wrapper.vm.applyAnalyticsData({
-        topStudents: [{ id: '1' }, { id: '3' }],
-        lowAttendance: [{ id: '4' }],
-        goodAttendance: [{ id: '1' }, { id: '2' }, { id: '3' }]
-      });
-      
+      wrapper.vm.deriveAnalyticsFromStudents();
+
       expect(wrapper.vm.getStudentStatus('1')).toBe('Отличник');
       expect(wrapper.vm.getStudentStatus('4')).toBe('Зона риска');
       expect(wrapper.vm.getStudentStatus('2')).toBe('Хор. посещ.');
@@ -193,17 +185,13 @@ describe('StudentRatingView.vue', () => {
   describe('фильтрация студентов', () => {
     beforeEach(() => {
       wrapper.vm.allStudentsData = [
-        { id: '1', name: 'Студент 1', group: 'ИСТб-21-1' },
-        { id: '2', name: 'Студент 2', group: 'ИСТб-21-1' },
-        { id: '3', name: 'Студент 3', group: 'ИСТб-21-2' },
-        { id: '4', name: 'Студент 4', group: 'ИСТб-21-2' }
+        { id: '1', name: 'Студент 1', group: 'ИСТб-21-1', avgGrade: 4.6, riskLevel: 'низкий', attendancePercent: 82 },
+        { id: '2', name: 'Студент 2', group: 'ИСТб-21-1', avgGrade: 3.8, riskLevel: 'низкий', attendancePercent: 88 },
+        { id: '3', name: 'Студент 3', group: 'ИСТб-21-2', avgGrade: 4.7, riskLevel: 'низкий', attendancePercent: 75 },
+        { id: '4', name: 'Студент 4', group: 'ИСТб-21-2', avgGrade: 3.1, riskLevel: 'высокий', attendancePercent: 45 }
       ];
-      
-      wrapper.vm.applyAnalyticsData({
-        topStudents: [{ id: '1' }, { id: '3' }],
-        lowAttendance: [{ id: '4' }],
-        goodAttendance: [{ id: '1' }, { id: '2' }, { id: '3' }]
-      });
+
+      wrapper.vm.deriveAnalyticsFromStudents();
     });
 
     it('фильтрует по статусу отличников', () => {
@@ -254,7 +242,7 @@ describe('StudentRatingView.vue', () => {
 
   describe('график рейтинга', () => {
     it('формирует данные для графика', () => {
-      wrapper.vm.chartData = mockStudentRatingData.chartData;
+      wrapper.vm.allChartEntries = mockStudentRatingData.chartData;
       const chartData = wrapper.vm.ratingChartData;
       
       expect(chartData.type).toBe('bar');
@@ -263,7 +251,7 @@ describe('StudentRatingView.vue', () => {
     });
 
     it('возвращает пустые данные при отсутствии данных', () => {
-      wrapper.vm.chartData = [];
+      wrapper.vm.allChartEntries = [];
       const chartData = wrapper.vm.ratingChartData;
       
       expect(chartData.data.labels).toEqual([]);

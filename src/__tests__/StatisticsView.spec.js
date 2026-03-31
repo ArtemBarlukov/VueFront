@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import StatisticsView from '../views/StatisticsView.vue';
 
@@ -67,7 +67,20 @@ describe('StatisticsView.vue', () => {
     ]
   };
 
-  const mockFetchData = vi.fn().mockResolvedValue(mockStatisticsData);
+  const mockFetchData = vi.fn().mockImplementation((url) => {
+    const u = String(url);
+    if (u.includes('/student-rating/')) {
+      return Promise.resolve({
+        students: [
+          { id: '1', group: 'ИСТб-21-1', attendancePercent: 80 },
+          { id: '2', group: 'ИСТб-21-1', attendancePercent: 90 },
+          { id: '3', group: 'ИСТб-21-2', attendancePercent: 55 },
+        ],
+        pagination: { total: 3, hasMore: false }
+      });
+    }
+    return Promise.resolve(mockStatisticsData);
+  });
 
   let wrapper;
 
@@ -238,11 +251,30 @@ describe('StatisticsView.vue', () => {
   });
 
   describe('групповая аналитика', () => {
-    it('генерирует моковые данные для групп', () => {
-      wrapper.vm.generateMockGroupAnalytics();
-      
+    it('строит данные для групповой аналитики из marks и обогащает посещаемостью', async () => {
+      wrapper.vm.statisticsData = {
+        summary: mockStatisticsData.summary,
+        students: [
+          {
+            id: '1',
+            group: 'ИСТб-21-1',
+            subjects: [{ subject: 'Математика', grades: [5, 4, 5] }]
+          },
+          {
+            id: '2',
+            group: 'ИСТб-21-2',
+            subjects: [{ subject: 'Математика', grades: [3, 3, 2] }]
+          }
+        ]
+      };
+
+      wrapper.vm.buildGroupAnalyticsFromMarks();
+      await flushPromises();
+
       expect(wrapper.vm.groupFullData.length).toBeGreaterThan(0);
       expect(wrapper.vm.groupAnalyticsLoaded).toBe(true);
+      // После enrichment посещаемость должна быть числом (либо 0 при отсутствии данных)
+      expect(typeof wrapper.vm.groupFullData[0].attendancePercent).toBe('number');
     });
 
     it('вычисляет лучшую группу', () => {
